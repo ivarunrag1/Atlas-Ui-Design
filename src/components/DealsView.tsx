@@ -1,0 +1,528 @@
+import { useState } from 'react';
+import {
+  LayoutGrid,
+  Rows3,
+  Search,
+  Plus,
+  Ship,
+  Container,
+  Package,
+  AlertTriangle,
+  CheckSquare,
+  StickyNote,
+  MessageSquarePlus,
+  Send,
+  ArrowUpDown,
+  SlidersHorizontal,
+  ChevronDown,
+  Check,
+} from 'lucide-react';
+import { deals as seedDeals, stages, stageColor, type DealSummary, type Stage } from '../data/deals';
+
+type ViewMode = 'kanban' | 'list';
+type SortKey = 'updated' | 'value' | 'company';
+
+const sortOptions: { key: SortKey; label: string }[] = [
+  { key: 'updated', label: 'Last updated' },
+  { key: 'value', label: 'Deal value' },
+  { key: 'company', label: 'Company A–Z' },
+];
+
+const numVal = (s: string) => Number(s.replace(/[^0-9.]/g, '')) || 0;
+const ageMin = (s: string) => {
+  if (/just now/i.test(s)) return 0;
+  const m = s.match(/(\d+)\s*([hd])/);
+  if (!m) return Number.MAX_SAFE_INTEGER;
+  return Number(m[1]) * (m[2] === 'h' ? 60 : 1440);
+};
+function sortDeals(xs: DealSummary[], by: SortKey) {
+  const arr = [...xs];
+  if (by === 'value') arr.sort((a, b) => numVal(b.value) - numVal(a.value));
+  else if (by === 'company') arr.sort((a, b) => a.company.localeCompare(b.company));
+  else arr.sort((a, b) => ageMin(a.updated) - ageMin(b.updated));
+  return arr;
+}
+
+function TradeLane({ origin, destination }: { origin: string; destination: string }) {
+  return (
+    <span className="inline-flex items-center gap-1.5 text-muted">
+      <Ship size={13} className="shrink-0 text-faint" />
+      {origin} → {destination}
+    </span>
+  );
+}
+
+function StageDot({ stage }: { stage: Stage }) {
+  return <span className="size-2 shrink-0 rounded-full" style={{ background: stageColor[stage] }} />;
+}
+
+function CheckBox({ on }: { on: boolean }) {
+  return (
+    <span
+      className={`grid size-4 shrink-0 place-items-center rounded border ${
+        on ? 'border-ink bg-ink text-canvas' : 'border-line-strong text-transparent'
+      }`}
+    >
+      <Check size={11} strokeWidth={3} />
+    </span>
+  );
+}
+
+/* ── Kanban card ───────────────────────────────────────────────────────────── */
+
+function KanbanCard({
+  deal,
+  onOpen,
+  onDragStart,
+  onDragEnd,
+  dragging,
+  onAddComment,
+}: {
+  deal: DealSummary;
+  onOpen: (d: DealSummary) => void;
+  onDragStart: () => void;
+  onDragEnd: () => void;
+  dragging: boolean;
+  onAddComment: (id: string) => void;
+}) {
+  const [commenting, setCommenting] = useState(false);
+  const [text, setText] = useState('');
+  const stop = (e: React.MouseEvent) => e.stopPropagation();
+
+  const submit = () => {
+    if (!text.trim()) return;
+    onAddComment(deal.id);
+    setText('');
+    setCommenting(false);
+  };
+
+  return (
+    <div
+      draggable
+      onDragStart={onDragStart}
+      onDragEnd={onDragEnd}
+      onClick={() => onOpen(deal)}
+      className={`cursor-pointer rounded-lg border border-line bg-surface p-3 transition-colors hover:border-line-strong ${
+        dragging ? 'opacity-40' : ''
+      }`}
+      style={{ borderLeftWidth: 3, borderLeftColor: stageColor[deal.stage] }}
+    >
+      <div className="flex items-start justify-between gap-2">
+        <span className="truncate text-[14px] font-semibold text-ink">{deal.company}</span>
+        {deal.alert && <AlertTriangle size={14} className="mt-0.5 shrink-0 text-danger" />}
+      </div>
+      <div className="mt-0.5 truncate text-[12px] text-muted">{deal.contact}</div>
+      <div className="mt-1 text-[12px]">
+        <TradeLane origin={deal.origin} destination={deal.destination} />
+      </div>
+      <div className="mt-1 flex items-center gap-1.5 text-[12px] text-muted">
+        {deal.mode === 'LCL' ? (
+          <Package size={13} className="shrink-0 text-faint" />
+        ) : (
+          <Container size={13} className="shrink-0 text-faint" />
+        )}
+        <span className="font-medium text-ink">{deal.mode}</span>
+        <span className="truncate">
+          {deal.mode === 'LCL' ? deal.load : `${deal.teu} · ${deal.equipment}`}
+        </span>
+      </div>
+      <div className="mt-2.5 flex items-center justify-between">
+        <span className="text-[14px] font-bold text-ink">{deal.value}</span>
+        <span className="text-[10px] text-faint">{deal.updated}</span>
+      </div>
+
+      {/* Quick actions */}
+      <div className="mt-2.5 flex items-center gap-3 border-t border-line pt-2 text-[10px] text-faint" onClick={stop}>
+        <span className="inline-flex items-center gap-1" title={`${deal.tasks} tasks`}>
+          <CheckSquare size={13} /> {deal.tasks}
+        </span>
+        <span className="inline-flex items-center gap-1" title={`${deal.notes} notes`}>
+          <StickyNote size={13} /> {deal.notes}
+        </span>
+        <button
+          onClick={() => setCommenting((v) => !v)}
+          className="ml-auto inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-medium hover:bg-subtle hover:text-ink"
+          title="Add comment"
+        >
+          <MessageSquarePlus size={13} /> {deal.comments > 0 ? deal.comments : 'Comment'}
+        </button>
+      </div>
+
+      {commenting && (
+        <div className="mt-2 flex items-center gap-1.5" onClick={stop}>
+          <input
+            autoFocus
+            value={text}
+            onChange={(e) => setText(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter') submit();
+              if (e.key === 'Escape') setCommenting(false);
+            }}
+            placeholder="Add a comment…"
+            className="min-w-0 flex-1 rounded-md border border-line bg-canvas px-2 py-1 text-[12px] text-ink outline-none focus:border-line-strong"
+          />
+          <button
+            onClick={submit}
+            aria-label="Post comment"
+            className="grid size-7 shrink-0 place-items-center rounded-md bg-ink text-canvas hover:bg-ink/90"
+          >
+            <Send size={13} />
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
+function Kanban({
+  columns,
+  onOpen,
+  onMove,
+  onAdd,
+  onAddComment,
+}: {
+  columns: { stage: Stage; deals: DealSummary[] }[];
+  onOpen: (d: DealSummary) => void;
+  onMove: (id: string, stage: Stage) => void;
+  onAdd: (stage: Stage) => void;
+  onAddComment: (id: string) => void;
+}) {
+  const [dragId, setDragId] = useState<string | null>(null);
+  const [overStage, setOverStage] = useState<Stage | null>(null);
+
+  return (
+    <div className="flex h-full gap-4 overflow-x-auto px-5 py-4">
+      {columns.map(({ stage, deals }) => {
+        const over = overStage === stage;
+        return (
+          <div
+            key={stage}
+            onDragOver={(e) => {
+              e.preventDefault();
+              if (overStage !== stage) setOverStage(stage);
+            }}
+            onDragLeave={(e) => {
+              if (!e.currentTarget.contains(e.relatedTarget as Node)) setOverStage(null);
+            }}
+            onDrop={(e) => {
+              e.preventDefault();
+              if (dragId) onMove(dragId, stage);
+              setDragId(null);
+              setOverStage(null);
+            }}
+            style={{ background: '#0c0d10' }}
+            className={`flex w-[290px] shrink-0 flex-col overflow-hidden rounded-xl border transition-colors ${
+              over ? 'border-line-strong' : 'border-line'
+            }`}
+          >
+            {/* Column header — same frame as the tiles */}
+            <div className="flex items-center justify-between border-b border-line px-3 py-2">
+              <span className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-wide text-muted">
+                <StageDot stage={stage} />
+                {stage}
+                <span className="rounded-full border border-line px-1.5 text-[10px] font-semibold text-faint">
+                  {deals.length}
+                </span>
+              </span>
+              <button
+                onClick={() => onAdd(stage)}
+                aria-label={`Add deal to ${stage}`}
+                className="grid size-6 place-items-center rounded-md text-faint hover:bg-subtle hover:text-ink"
+              >
+                <Plus size={15} />
+              </button>
+            </div>
+
+            {/* Tiles */}
+            <div className={`flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2 ${over ? 'bg-subtle/40' : ''}`}>
+              {deals.map((d) => (
+                <KanbanCard
+                  key={d.id}
+                  deal={d}
+                  onOpen={onOpen}
+                  onAddComment={onAddComment}
+                  dragging={dragId === d.id}
+                  onDragStart={() => setDragId(d.id)}
+                  onDragEnd={() => {
+                    setDragId(null);
+                    setOverStage(null);
+                  }}
+                />
+              ))}
+              {deals.length === 0 && (
+                <div className="grid place-items-center py-8 text-[12px] text-faint">Drop deals here</div>
+              )}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+/* ── List ──────────────────────────────────────────────────────────────────── */
+
+const listCols = 'grid-cols-[1.5fr_1fr_1.1fr_1fr_0.8fr_0.7fr]';
+
+function List({ rows, onOpen }: { rows: DealSummary[]; onOpen: (d: DealSummary) => void }) {
+  return (
+    <div className="h-full overflow-y-auto px-5 py-4">
+      <div className="overflow-hidden rounded-xl border border-line">
+        <div className={`grid ${listCols} gap-4 border-b border-line bg-canvas px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wide text-faint`}>
+          <span>Company</span>
+          <span>Contact</span>
+          <span>Trade lane</span>
+          <span>Stage</span>
+          <span className="text-right">Deal value</span>
+          <span className="text-right">Updated</span>
+        </div>
+        {rows.map((d) => (
+          <button
+            key={d.id}
+            onClick={() => onOpen(d)}
+            className={`grid ${listCols} w-full items-center gap-4 border-b border-line px-4 py-3 text-left text-[14px] transition-colors last:border-0 hover:bg-subtle/40`}
+          >
+            <span className="flex min-w-0 items-center gap-2">
+              <span className="truncate font-semibold text-ink">{d.company}</span>
+              {d.alert && <AlertTriangle size={13} className="shrink-0 text-danger" />}
+            </span>
+            <span className="truncate text-muted">{d.contact}</span>
+            <span className="truncate">
+              <TradeLane origin={d.origin} destination={d.destination} />
+            </span>
+            <span className="flex items-center gap-1.5 text-muted">
+              <StageDot stage={d.stage} />
+              {d.stage}
+            </span>
+            <span className="text-right font-bold text-ink">{d.value}</span>
+            <span className="text-right text-[12px] text-faint">{d.updated}</span>
+          </button>
+        ))}
+        {rows.length === 0 && (
+          <div className="grid place-items-center py-10 text-[14px] text-faint">No deals match your filters</div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+/* ── View ──────────────────────────────────────────────────────────────────── */
+
+export function DealsView({ onOpenDeal }: { onOpenDeal: (d: DealSummary) => void }) {
+  const [mode, setMode] = useState<ViewMode>('kanban');
+  const [items, setItems] = useState<DealSummary[]>(seedDeals);
+
+  const [query, setQuery] = useState('');
+  const [sortBy, setSortBy] = useState<SortKey>('updated');
+  const [alertsOnly, setAlertsOnly] = useState(false);
+  const [filterStages, setFilterStages] = useState<Set<Stage>>(new Set());
+  const [sortOpen, setSortOpen] = useState(false);
+  const [filterOpen, setFilterOpen] = useState(false);
+
+  const move = (id: string, stage: Stage) =>
+    setItems((xs) => xs.map((d) => (d.id === id ? { ...d, stage, updated: 'just now' } : d)));
+  const addComment = (id: string) =>
+    setItems((xs) => xs.map((d) => (d.id === id ? { ...d, comments: d.comments + 1 } : d)));
+  const addDeal = (stage: Stage) =>
+    setItems((xs) => [
+      {
+        id: `AT-NEW-${Date.now() % 100000}`,
+        company: 'New deal',
+        contact: '—',
+        contactRole: '—',
+        contactEmail: '—',
+        origin: '—',
+        destination: '—',
+        teu: '—',
+        equipment: '—',
+        mode: 'FCL',
+        owner: 'Varun Reddy',
+        value: '$0',
+        stage,
+        updated: 'just now',
+        tasks: 0,
+        notes: 0,
+        comments: 0,
+        nextInteraction: { when: '—', detail: 'Not scheduled' },
+        lastInteraction: { when: '—', detail: 'No activity yet' },
+        nextTask: { when: '—', detail: 'No task' },
+      },
+      ...xs,
+    ]);
+
+  const toggleStage = (s: Stage) =>
+    setFilterStages((prev) => {
+      const n = new Set(prev);
+      n.has(s) ? n.delete(s) : n.add(s);
+      return n;
+    });
+  const clearFilters = () => {
+    setAlertsOnly(false);
+    setFilterStages(new Set());
+  };
+  const activeFilters = (alertsOnly ? 1 : 0) + filterStages.size;
+
+  const q = query.trim().toLowerCase();
+  const matches = (d: DealSummary) => {
+    if (q && !(d.company.toLowerCase().includes(q) || d.contact.toLowerCase().includes(q) || `${d.origin} ${d.destination}`.toLowerCase().includes(q)))
+      return false;
+    if (alertsOnly && !d.alert) return false;
+    return true;
+  };
+
+  const visibleStages = filterStages.size ? stages.filter((s) => filterStages.has(s)) : stages;
+  const columns = visibleStages.map((stage) => ({
+    stage,
+    deals: sortDeals(items.filter((d) => d.stage === stage && matches(d)), sortBy),
+  }));
+  const rows = sortDeals(
+    items.filter((d) => matches(d) && (filterStages.size === 0 || filterStages.has(d.stage))),
+    sortBy,
+  );
+
+  const sortLabel = sortOptions.find((o) => o.key === sortBy)!.label;
+
+  return (
+    <div className="flex min-w-0 flex-1 flex-col">
+      {/* Top bar */}
+      <header className="flex items-center justify-between gap-3 border-b border-line bg-surface px-6 py-3">
+        <div className="flex items-baseline gap-2">
+          <h1 className="t-page text-ink">Pipeline</h1>
+          <span className="text-[14px] text-faint">{rows.length} deals</span>
+        </div>
+
+        <div className="flex items-center gap-2">
+          <div className="flex items-center rounded-lg border border-line bg-canvas px-2.5 py-1.5">
+            <Search size={14} className="text-faint" />
+            <input
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search deals…"
+              className="w-36 bg-transparent px-2 text-[14px] text-ink outline-none placeholder:text-faint"
+            />
+          </div>
+
+          {/* Sort */}
+          <div className="relative">
+            <button
+              onClick={() => setSortOpen((o) => !o)}
+              className="flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-[14px] font-medium text-ink hover:bg-subtle"
+            >
+              <ArrowUpDown size={14} className="text-muted" />
+              {sortLabel}
+              <ChevronDown size={14} className="text-faint" />
+            </button>
+            {sortOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setSortOpen(false)} />
+                <div className="absolute right-0 z-20 mt-1 w-44 rounded-lg border border-line bg-surface p-1 shadow-xl">
+                  {sortOptions.map((o) => (
+                    <button
+                      key={o.key}
+                      onClick={() => {
+                        setSortBy(o.key);
+                        setSortOpen(false);
+                      }}
+                      className="flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-[14px] text-ink hover:bg-subtle"
+                    >
+                      {o.label}
+                      {sortBy === o.key && <Check size={14} className="text-ink" />}
+                    </button>
+                  ))}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Filter */}
+          <div className="relative">
+            <button
+              onClick={() => setFilterOpen((o) => !o)}
+              className="flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-[14px] font-medium text-ink hover:bg-subtle"
+            >
+              <SlidersHorizontal size={14} className="text-muted" />
+              Filter
+              {activeFilters > 0 && (
+                <span className="grid size-4 place-items-center rounded-full bg-ink text-[10px] font-bold text-canvas">
+                  {activeFilters}
+                </span>
+              )}
+              <ChevronDown size={14} className="text-faint" />
+            </button>
+            {filterOpen && (
+              <>
+                <div className="fixed inset-0 z-10" onClick={() => setFilterOpen(false)} />
+                <div className="absolute right-0 z-20 mt-1 w-56 rounded-lg border border-line bg-surface p-1 shadow-xl">
+                  <button
+                    onClick={() => setAlertsOnly((v) => !v)}
+                    className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-[14px] text-ink hover:bg-subtle"
+                  >
+                    <CheckBox on={alertsOnly} />
+                    Alerts only
+                  </button>
+                  <div className="my-1 border-t border-line" />
+                  <div className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-faint">Stage</div>
+                  {stages.map((s) => (
+                    <button
+                      key={s}
+                      onClick={() => toggleStage(s)}
+                      className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-[14px] text-ink hover:bg-subtle"
+                    >
+                      <CheckBox on={filterStages.has(s)} />
+                      <StageDot stage={s} />
+                      {s}
+                    </button>
+                  ))}
+                  {activeFilters > 0 && (
+                    <>
+                      <div className="my-1 border-t border-line" />
+                      <button
+                        onClick={clearFilters}
+                        className="w-full rounded-md px-2.5 py-1.5 text-left text-[14px] font-medium text-muted hover:bg-subtle hover:text-ink"
+                      >
+                        Clear all filters
+                      </button>
+                    </>
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Kanban / List toggle */}
+          <div className="flex items-center gap-0.5 rounded-lg border border-line p-0.5">
+            <button
+              onClick={() => setMode('kanban')}
+              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[14px] font-medium transition-colors ${
+                mode === 'kanban' ? 'bg-subtle text-ink' : 'text-muted hover:text-ink'
+              }`}
+            >
+              <LayoutGrid size={14} /> Kanban
+            </button>
+            <button
+              onClick={() => setMode('list')}
+              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[14px] font-medium transition-colors ${
+                mode === 'list' ? 'bg-subtle text-ink' : 'text-muted hover:text-ink'
+              }`}
+            >
+              <Rows3 size={14} /> List
+            </button>
+          </div>
+
+          <button className="flex items-center gap-1.5 rounded-lg bg-ink px-3 py-1.5 text-[14px] font-semibold text-canvas hover:bg-ink/90">
+            <Plus size={15} /> New deal
+          </button>
+        </div>
+      </header>
+
+      {/* Body */}
+      <div className="min-h-0 flex-1 bg-surface">
+        {mode === 'kanban' ? (
+          <Kanban columns={columns} onOpen={onOpenDeal} onMove={move} onAdd={addDeal} onAddComment={addComment} />
+        ) : (
+          <List rows={rows} onOpen={onOpenDeal} />
+        )}
+      </div>
+    </div>
+  );
+}
