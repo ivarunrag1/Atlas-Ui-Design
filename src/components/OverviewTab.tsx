@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import {
   FileText,
   Mail,
@@ -12,12 +12,15 @@ import {
   Calendar,
   AlertTriangle,
   Check,
-  X,
   type LucideIcon,
 } from 'lucide-react';
 import { stages, stageColor, type DealSummary, type Stage } from '../data/deals';
 import { deal as demo, type Activity } from '../data/deal';
 import { ActivityTimeline } from './activity';
+import { Button } from '@/components/ui/button';
+import { Card, CardIcon } from '@/components/ui/card';
+import { SectionLabel } from '@/components/ui/field';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogBody, DialogFooter } from '@/components/ui/dialog';
 
 /** Generic quick-stat card — 12px padding, 8px gaps, icon on the label. */
 function Stat({
@@ -32,13 +35,13 @@ function Stat({
   children: React.ReactNode;
 }) {
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-line bg-canvas p-3">
-      <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.04em] text-faint">
+    <Card className="flex flex-col gap-2 p-3">
+      <SectionLabel as="div" className="flex items-center gap-1.5">
         <Icon size={13} /> {label}
-      </div>
+      </SectionLabel>
       <div className="text-[14px] font-semibold text-ink">{children}</div>
       {sub && <div className="text-[12px] text-muted">{sub}</div>}
-    </div>
+    </Card>
   );
 }
 
@@ -46,10 +49,10 @@ function Stat({
 function StageCard({ stage }: { stage: Stage }) {
   const idx = stages.indexOf(stage);
   return (
-    <div className="flex flex-col gap-2 rounded-lg border border-line bg-canvas p-3">
-      <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.04em] text-faint">
+    <Card className="flex flex-col gap-2 p-3">
+      <SectionLabel as="div" className="flex items-center gap-1.5">
         <Milestone size={13} /> Deal stage
-      </div>
+      </SectionLabel>
       <div className="text-[14px] font-semibold text-ink">{stage}</div>
       <div className="flex items-center gap-1">
         {stages.map((s, i) => (
@@ -57,23 +60,17 @@ function StageCard({ stage }: { stage: Stage }) {
             key={s}
             title={s}
             className="h-1.5 flex-1 rounded-full"
-            style={{ background: stageColor[s], opacity: i === idx ? 1 : 0.3 }}
+            style={{ background: stageColor[s], opacity: i === idx ? 1 : 0.2 }}
           />
         ))}
       </div>
-    </div>
+    </Card>
   );
 }
 
 export function OverviewTab({ deal, log }: { deal: DealSummary; log: Activity[] }) {
   const [taskOpen, setTaskOpen] = useState(false);
   const [taskDone, setTaskDone] = useState(false);
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => e.key === 'Escape' && setTaskOpen(false);
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, []);
 
   // Mark the task urgent when it's due today or past deadline.
   const dueWhen = deal.nextTask.when.toLowerCase();
@@ -99,147 +96,130 @@ export function OverviewTab({ deal, log }: { deal: DealSummary; log: Activity[] 
           </Stat>
 
           {/* Next due task — description + due date; marked if due today/overdue; opens a popup */}
-          <button
-            onClick={() => setTaskOpen(true)}
-            className={`flex flex-col gap-2 rounded-lg border bg-canvas p-3 text-left transition-colors hover:border-line-strong ${
-              urgent ? 'border-danger/40' : 'border-line'
-            }`}
-          >
-            <div className="flex items-center gap-1.5 text-[10px] font-medium uppercase tracking-[0.04em] text-faint">
-              {taskDone ? <CircleCheck size={13} /> : <ListTodo size={13} />} Next due task
-            </div>
-            <div className={`text-[14px] font-semibold ${taskDone ? 'text-success line-through' : 'text-ink'}`}>
-              {deal.nextTask.detail}
-            </div>
-            {taskDone ? (
-              <div className="flex items-center gap-1 text-[12px] font-medium text-success">
-                <CircleCheck size={12} /> Completed
+          <Card asChild interactive className={urgent ? 'border-danger/40' : undefined}>
+            <button onClick={() => setTaskOpen(true)} className="flex flex-col gap-2 p-3">
+              <SectionLabel as="div" className="flex items-center gap-1.5">
+                {taskDone ? <CircleCheck size={13} /> : <ListTodo size={13} />} Next due task
+              </SectionLabel>
+              <div className={`text-[14px] font-semibold ${taskDone ? 'text-success line-through' : 'text-ink'}`}>
+                {deal.nextTask.detail}
               </div>
-            ) : (
-              <div
-                className={`flex items-center gap-1 text-[12px] ${
-                  urgent ? 'font-medium text-danger' : 'text-muted'
-                }`}
-              >
-                {urgent ? <AlertTriangle size={12} /> : <Calendar size={12} />}
-                {deal.nextTask.when}
-              </div>
-            )}
-          </button>
+              {taskDone ? (
+                <div className="flex items-center gap-1 text-[12px] font-medium text-success">
+                  <CircleCheck size={12} /> Completed
+                </div>
+              ) : (
+                <div
+                  className={`flex items-center gap-1 text-[12px] ${
+                    urgent ? 'font-medium text-danger' : 'text-muted'
+                  }`}
+                >
+                  {urgent ? <AlertTriangle size={12} /> : <Calendar size={12} />}
+                  {deal.nextTask.when}
+                </div>
+              )}
+            </button>
+          </Card>
         </div>
 
         {/* Recent activity */}
         <section>
-          <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-faint">Recent activity</h3>
+          <SectionLabel as="h3" className="mb-2">
+            Recent activity
+          </SectionLabel>
           <ActivityTimeline log={log} />
         </section>
 
         {/* Linked records */}
         <section>
-          <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-faint">Linked records</h3>
+          <SectionLabel as="h3" className="mb-2">
+            Linked records
+          </SectionLabel>
           <div className="space-y-2">
-            <button className="flex w-full items-center gap-3 rounded-lg border border-line bg-surface px-3 py-2.5 text-left hover:bg-subtle">
-              <span className="grid size-8 place-items-center rounded-md border border-line text-muted">
-                <FileText size={16} />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block text-[14px] font-semibold text-ink">Quote #{demo.linked.quote.id}</span>
-                <span className="block text-[12px] text-faint">{demo.linked.quote.meta}</span>
-              </span>
-            </button>
-            <button className="flex w-full items-center gap-3 rounded-lg border border-line bg-surface px-3 py-2.5 text-left hover:bg-subtle">
-              <span className="grid size-8 place-items-center rounded-md border border-line text-muted">
-                <Mail size={16} />
-              </span>
-              <span className="min-w-0 flex-1">
-                <span className="block truncate text-[14px] font-semibold text-ink">{demo.linked.thread.subject}</span>
-                <span className="block text-[12px] text-faint">{demo.linked.thread.meta}</span>
-              </span>
-            </button>
+            <Card asChild interactive>
+              <button className="flex w-full items-center gap-3 px-4 py-3">
+                <CardIcon>
+                  <FileText size={16} />
+                </CardIcon>
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[14px] font-semibold text-ink">Quote #{demo.linked.quote.id}</span>
+                  <span className="block text-[12px] text-faint">{demo.linked.quote.meta}</span>
+                </span>
+              </button>
+            </Card>
+            <Card asChild interactive>
+              <button className="flex w-full items-center gap-3 px-4 py-3">
+                <CardIcon>
+                  <Mail size={16} />
+                </CardIcon>
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[14px] font-semibold text-ink">{demo.linked.thread.subject}</span>
+                  <span className="block text-[12px] text-faint">{demo.linked.thread.meta}</span>
+                </span>
+              </button>
+            </Card>
           </div>
         </section>
       </div>
 
       {/* Task popup */}
-      {taskOpen && (
-        <div className="fixed inset-0 z-50 flex bg-black/60 p-6" onClick={() => setTaskOpen(false)}>
-          <div
-            onClick={(e) => e.stopPropagation()}
-            className="m-auto w-[min(440px,94vw)] overflow-hidden rounded-xl border border-line bg-surface"
-          >
-            <div className="flex items-center justify-between border-b border-line px-5 py-4">
-              <h2 className="t-popup text-ink">Task</h2>
-              <button
-                onClick={() => setTaskOpen(false)}
-                aria-label="Close"
-                className="grid size-8 place-items-center rounded-lg text-muted hover:bg-subtle"
-              >
-                <X size={18} />
-              </button>
-            </div>
+      <Dialog open={taskOpen} onOpenChange={setTaskOpen}>
+        <DialogContent aria-describedby={undefined}>
+          <DialogHeader>
+            <DialogTitle>Task</DialogTitle>
+          </DialogHeader>
 
-            <div className="space-y-4 px-5 py-4">
+          <DialogBody className="space-y-4">
+            <div>
+              <SectionLabel as="div">Task</SectionLabel>
+              <div className={`mt-1 text-[16px] font-semibold ${taskDone ? 'text-success line-through' : 'text-ink'}`}>
+                {deal.nextTask.detail}
+              </div>
+            </div>
+            <div className="grid grid-cols-2 gap-4">
               <div>
-                <div className="text-[10px] font-medium uppercase tracking-[0.04em] text-faint">Task</div>
-                <div
-                  className={`mt-1 text-[16px] font-semibold ${taskDone ? 'text-success line-through' : 'text-ink'}`}
-                >
-                  {deal.nextTask.detail}
+                <SectionLabel as="div">Due</SectionLabel>
+                <div className={`mt-1 flex items-center gap-1 text-[14px] ${urgent ? 'font-medium text-danger' : 'text-ink'}`}>
+                  {urgent && <AlertTriangle size={13} />}
+                  {deal.nextTask.when}
                 </div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <div className="text-[10px] font-medium uppercase tracking-[0.04em] text-faint">Due</div>
-                  <div
-                    className={`mt-1 flex items-center gap-1 text-[14px] ${
-                      urgent ? 'font-medium text-danger' : 'text-ink'
-                    }`}
-                  >
-                    {urgent && <AlertTriangle size={13} />}
-                    {deal.nextTask.when}
-                  </div>
-                </div>
-                <div>
-                  <div className="text-[10px] font-medium uppercase tracking-[0.04em] text-faint">Owner</div>
-                  <div className="mt-1 text-[14px] text-ink">{deal.owner}</div>
-                </div>
-                <div className="col-span-2">
-                  <div className="text-[10px] font-medium uppercase tracking-[0.04em] text-faint">Deal</div>
-                  <div className="mt-1 text-[14px] text-ink">
-                    {deal.company} · {deal.contact}
-                  </div>
+              <div>
+                <SectionLabel as="div">Owner</SectionLabel>
+                <div className="mt-1 text-[14px] text-ink">{deal.owner}</div>
+              </div>
+              <div className="col-span-2">
+                <SectionLabel as="div">Deal</SectionLabel>
+                <div className="mt-1 text-[14px] text-ink">
+                  {deal.company} · {deal.contact}
                 </div>
               </div>
-              {taskDone && (
-                <div className="flex items-center gap-1.5 text-[12px] text-success">
-                  <CircleCheck size={14} /> Marked complete
-                </div>
-              )}
             </div>
+            {taskDone && (
+              <div className="flex items-center gap-1.5 text-[12px] text-success">
+                <CircleCheck size={14} /> Marked complete
+              </div>
+            )}
+          </DialogBody>
 
-            <div className="flex items-center justify-end gap-2 border-t border-line px-5 py-3">
-              {taskDone ? (
-                <button
-                  onClick={() => setTaskDone(false)}
-                  className="rounded-lg border border-line px-3 py-1.5 text-[14px] font-medium text-muted hover:bg-subtle"
-                >
-                  Reopen task
-                </button>
-              ) : (
-                <button
-                  onClick={() => {
-                    setTaskDone(true);
-                    setTaskOpen(false);
-                  }}
-                  className="flex items-center gap-1.5 rounded-lg bg-ink px-3 py-1.5 text-[14px] font-semibold text-canvas hover:bg-ink/90"
-                >
-                  <Check size={15} /> Mark as complete
-                </button>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
+          <DialogFooter>
+            {taskDone ? (
+              <Button variant="outline" onClick={() => setTaskDone(false)} className="text-muted">
+                Reopen task
+              </Button>
+            ) : (
+              <Button
+                onClick={() => {
+                  setTaskDone(true);
+                  setTaskOpen(false);
+                }}
+              >
+                <Check size={15} /> Mark as complete
+              </Button>
+            )}
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

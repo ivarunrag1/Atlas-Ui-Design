@@ -15,6 +15,7 @@ import {
   Pencil,
   type LucideIcon,
 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import type { Activity, ActivityStep, ActivityType, Actor } from '../data/deal';
 import { Avatar, actorStyle } from './ui';
 
@@ -81,12 +82,15 @@ export function ActivityItem({
   connector = false,
   pending = false,
   compact = false,
+  stacked = false,
 }: {
   item: Activity;
   connector?: boolean;
   pending?: boolean;
   /** Timeline mode — show only event title, actor and timestamp (no detail/steps). */
   compact?: boolean;
+  /** Chat mode — icon + title on one line, everything else full-width below it. */
+  stacked?: boolean;
 }) {
   const Icon = typeIcon[item.type];
   const [open, setOpen] = useState(true); // steps visible by default
@@ -96,7 +100,7 @@ export function ActivityItem({
     return (
       <div className="flex items-center gap-2 py-1">
         <Avatar initials={actorInitial[item.actor]} actor={item.actor} size={18} />
-        <span className="min-w-0 flex-1 truncate text-[13px]">
+        <span className="min-w-0 flex-1 truncate text-[14px]">
           <span className="font-medium text-ink">{actorStyle[item.actor].label}</span>{' '}
           <span className="text-muted">{item.title}</span>
         </span>
@@ -106,6 +110,47 @@ export function ActivityItem({
           </span>
         )}
         <span className="ml-1 shrink-0 text-[12px] text-faint">{item.timestamp}</span>
+      </div>
+    );
+  }
+
+  // Agent chat — header line (icon + summary), then detail / meta / steps underneath.
+  if (stacked) {
+    return (
+      <div className="min-w-0">
+        <div className="flex items-center gap-2">
+          <span className="grid size-6 shrink-0 place-items-center rounded-full border border-line text-muted">
+            <Icon size={13} />
+          </span>
+          <span className="min-w-0 flex-1 text-[14px] font-semibold leading-snug text-ink">{item.title}</span>
+          {pending && (
+            <span className="inline-flex shrink-0 items-center gap-1 rounded-full border border-atlas/40 px-2 py-0.5 text-[10px] font-semibold text-atlas">
+              <Sparkles size={10} /> in 2h
+            </span>
+          )}
+        </div>
+        {item.detail && <p className="mt-1.5 text-[12px] leading-snug text-muted">{item.detail}</p>}
+        <div className="mt-1 flex items-center gap-1.5 text-[10px] text-muted">
+          <Avatar initials={actorInitial[item.actor]} actor={item.actor} size={16} />
+          <span className="font-medium">{actorStyle[item.actor].label}</span>
+          <span className="text-faint">·</span>
+          <span className="text-faint">{item.timestamp}</span>
+        </div>
+        {item.steps && (
+          <>
+            <Button
+              variant="ghost"
+              size="xs"
+              onClick={() => setOpen((v) => !v)}
+              className="mt-1.5 -ml-2 h-6 gap-1 text-[10px] font-semibold"
+            >
+              <ListChecks size={13} />
+              {item.steps.length} agent steps
+              <ChevronDown size={13} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+            </Button>
+            {open && <StepList steps={item.steps} />}
+          </>
+        )}
       </div>
     );
   }
@@ -139,14 +184,16 @@ export function ActivityItem({
 
         {!compact && item.steps && (
           <>
-            <button
+            <Button
+              variant="ghost"
+              size="xs"
               onClick={() => setOpen((v) => !v)}
-              className="mt-2 flex items-center gap-1 rounded-md text-[10px] font-semibold text-muted hover:text-ink"
+              className="mt-1.5 -ml-2 h-6 gap-1 text-[10px] font-semibold"
             >
               <ListChecks size={13} />
               {item.steps.length} agent steps
               <ChevronDown size={13} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
-            </button>
+            </Button>
             {open && <StepList steps={item.steps} />}
           </>
         )}

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { Fragment, useEffect, useRef, useState } from 'react';
 import {
   Check,
   Search,
@@ -6,18 +6,47 @@ import {
   Receipt,
   FileText,
   SendHorizontal,
-  ChevronLeft,
-  ChevronRight,
   Sparkles,
   Mail,
-  Plus,
-  X,
   PanelLeftClose,
   PanelLeftOpen,
+  Layers,
+  Plus,
+  Ship,
+  User,
   type LucideIcon,
 } from 'lucide-react';
 import { deal } from '../data/deal';
-import { EmailThread } from './EmailThread';
+import { EmailThread, type QuoteDraft } from './EmailThread';
+import { QuoteDraftStep, addDaysIso } from './QuoteDraftStep';
+import { QuoteSentSummary } from './QuoteSentSummary';
+import { PriceHeader, RateResultCard, type PricingLevel } from './RateResultCard';
+import { CommonChargesCard, type ChargeOps } from './RateDetails';
+import { RecapRow, SearchResults, StickyHeader, type SearchRecap } from './SearchResults';
+import { rateCards, allInOf, chargeBreakdown, type LegCharges, type RateCard, type SearchLine } from '../data/rates';
+import {
+  addCharge,
+  extractCommon,
+  removeCharge,
+  replaceCharge,
+  restoreCommon,
+  runChargeCommand,
+  type CommonExtraction,
+} from '../data/chargeEdits';
+import { useAgent } from '@/lib/agent-context';
+import { LaneFields, type Leg } from './LocationField';
+import { LoadDetails, type Load } from './LoadDetails';
+import { contacts, type ContactSummary } from '../data/contacts';
+import { ChipCombobox } from '@/components/ui/combobox';
+import { SegmentedControl } from '@/components/ui/segmented-control';
+import { GroupedMultiSelect, type MultiSelectGroup } from '@/components/ui/multi-select';
+import { doorLocations, portByCode } from '../data/locations';
+import { Chip } from './ui';
+import { Button } from '@/components/ui/button';
+import { Input, Select } from '@/components/ui/input';
+import { Field } from '@/components/ui/field';
+import { Card, CardHeader, CardContent } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
 
 /* ── The enquiry run (would come from the agent run in production) ─────────── */
 
@@ -26,93 +55,81 @@ type StepStatus = 'done' | 'current' | 'pending';
 const steps: { label: string; icon: LucideIcon; sub: string; detail: string; status: StepStatus }[] = [
   { label: 'Search rates', icon: Search, sub: 'Query live carrier rates', detail: 'Parameters Atlas used to query carrier rates', status: 'done' },
   { label: 'Select results', icon: ListChecks, sub: 'Shortlist rate cards', detail: 'Pick one or more carriers to carry into the quote', status: 'done' },
-  { label: 'Finalize pricing', icon: Receipt, sub: 'Edit charges · add margin', detail: 'All selected options — adjust charges and margin on the left', status: 'done' },
+  { label: 'Finalize pricing', icon: Receipt, sub: 'Edit charges · add margin', detail: 'Selected rates from step 2 — edit buy/sell amounts in the tables, or ask Atlas', status: 'done' },
   { label: 'Draft quote', icon: FileText, sub: 'Generate the quote PDF', detail: 'Generated Quote #Q-0142.pdf', status: 'done' },
-  { label: 'Send quote', icon: SendHorizontal, sub: 'Email the customer', detail: 'Auto-sent after the preview window closed', status: 'done' },
+  { label: 'Send quote', icon: SendHorizontal, sub: 'Email the customer', detail: 'Quote sent — track the response and record the next action', status: 'done' },
 ];
 
-interface RateCard {
-  carrier: string;
-  service: string;
-  route: string;
-  transit: string;
-  validUntil: string;
-  /** Carrier-specific ocean portion, split per equipment type. */
-  equipment: { type: string; qty: number; subtotal: number }[];
-}
 
-const route = 'INNSA → DEHAM · Nhava Sheva → Hamburg';
-
-const rateCards: RateCard[] = [
-  { carrier: 'Maersk', service: 'FAK', route, transit: '28 days', validUntil: '31 Dec 2026', equipment: [{ type: "40'HC", qty: 9, subtotal: 82800 }] },
-  { carrier: 'MSC', service: 'FAK', route, transit: '31 days', validUntil: '31 Dec 2026', equipment: [{ type: "40'HC", qty: 9, subtotal: 81000 }] },
-  { carrier: 'CMA CGM', service: 'FAK', route, transit: '30 days', validUntil: '28 Dec 2026', equipment: [{ type: "40'HC", qty: 9, subtotal: 84300 }] },
-  { carrier: 'Hapag-Lloyd', service: 'FAK', route, transit: '29 days', validUntil: '31 Dec 2026', equipment: [{ type: "40'HC", qty: 9, subtotal: 84900 }] },
-  { carrier: 'ONE', service: 'FAK', route, transit: '33 days', validUntil: '24 Dec 2026', equipment: [{ type: "40'HC", qty: 9, subtotal: 80600 }] },
+/* Step-1 option lists (would come from the rate platform in production). */
+const platformGroups: MultiSelectGroup[] = [
+  {
+    label: 'Platform rates',
+    options: [
+      { value: 'contract', label: 'Contract rates', icon: <Layers size={13} className="text-muted" /> },
+      { value: 'spot', label: 'Spot rates', icon: <Layers size={13} className="text-muted" /> },
+      { value: 'tariff', label: 'Tariff rates', icon: <Layers size={13} className="text-muted" /> },
+    ],
+  },
 ];
 
-interface Charge {
-  id: string;
-  label: string;
-  value: number;
-}
-
-const initialCharges: Charge[] = [
-  { id: 'baf', label: 'Bunker / currency adj (BAF/CAF)', value: 3300 },
-  { id: 'thco', label: 'THC — origin (INNSA)', value: 4050 },
-  { id: 'thcd', label: 'THC — destination (DEHAM)', value: 5400 },
-  { id: 'doc', label: 'Documentation & B/L', value: 450 },
+const onlineCarrierGroups: MultiSelectGroup[] = [
+  {
+    label: 'Carrier instant quotes',
+    options: [
+      { value: 'maersk', label: 'Maersk Spot', icon: <Ship size={13} className="text-muted" /> },
+      { value: 'msc', label: 'MSC Instant Quote', icon: <Ship size={13} className="text-muted" /> },
+      { value: 'cma', label: 'CMA CGM SpotOn', icon: <Ship size={13} className="text-muted" /> },
+      { value: 'hapag', label: 'Hapag-Lloyd Quick Quotes', icon: <Ship size={13} className="text-muted" /> },
+      { value: 'one', label: 'ONE Quote', icon: <Ship size={13} className="text-muted" /> },
+    ],
+  },
 ];
 
-const usd = (n: number) => `$${n.toLocaleString('en-US')}`;
+const valueAddedServiceGroups: MultiSelectGroup[] = [
+  {
+    label: 'Customs',
+    options: [
+      { value: 'export-customs', label: 'Export customs clearance' },
+      { value: 'import-customs', label: 'Import customs clearance' },
+    ],
+  },
+  {
+    label: 'Cargo protection',
+    options: [
+      { value: 'insurance', label: 'Cargo insurance' },
+      { value: 'fumigation', label: 'Fumigation' },
+      { value: 'survey', label: 'Inspection / survey' },
+    ],
+  },
+  {
+    label: 'Handling & documents',
+    options: [
+      { value: 'warehousing', label: 'Warehousing' },
+      { value: 'lashing', label: 'Lashing & choking' },
+      { value: 'coo', label: 'Certificate of origin' },
+    ],
+  },
+];
 
-const oceanOf = (c: RateCard) => c.equipment.reduce((a, e) => a + e.subtotal, 0);
-const costOf = (c: RateCard, charges: Charge[]) => oceanOf(c) + charges.reduce((a, ch) => a + ch.value, 0);
-const sellOf = (c: RateCard, charges: Charge[], margin: number) =>
-  Math.round(costOf(c, charges) * (1 + margin / 100));
+const salesPeople = ['Varun Reddy', 'Aisha Khan', 'Daniel Brooks', 'Mei Lin', 'Rohan Iyer'];
 
-const carriers = ['All carriers', 'Maersk', 'MSC', 'CMA CGM', 'Hapag-Lloyd', 'ONE'];
-const equipmentTypes = ["40'HC ×9", "40'HC ×1", "40'GP", "20'GP", "40'RF"];
+const currencies = ['USD', 'EUR', 'INR', 'GBP', 'AED', 'SGD', 'CNY'];
 
-/* ── Form primitives ───────────────────────────────────────────────────────── */
+const incoterms = [
+  'EXW — Ex Works',
+  'FCA — Free Carrier',
+  'FAS — Free Alongside Ship',
+  'FOB — Free On Board',
+  'CFR — Cost and Freight',
+  'CIF — Cost, Insurance and Freight',
+  'CPT — Carriage Paid To',
+  'CIP — Carriage and Insurance Paid To',
+  'DAP — Delivered At Place',
+  'DPU — Delivered at Place Unloaded',
+  'DDP — Delivered Duty Paid',
+];
 
-const labelCls = 't-label text-muted';
-const inputCls =
-  'rounded-lg border border-line bg-canvas px-3 py-2 text-[14px] text-ink outline-none focus:border-line-strong';
-
-function TextField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
-  return (
-    <label className="flex flex-col gap-1">
-      <span className={labelCls}>{label}</span>
-      <input value={value} onChange={(e) => onChange(e.target.value)} className={inputCls} />
-    </label>
-  );
-}
-
-function SelectField({
-  label,
-  value,
-  onChange,
-  options,
-}: {
-  label: string;
-  value: string;
-  onChange: (v: string) => void;
-  options: string[];
-}) {
-  return (
-    <label className="flex flex-col gap-1">
-      <span className={labelCls}>{label}</span>
-      <select value={value} onChange={(e) => onChange(e.target.value)} className={inputCls}>
-        {options.map((o) => (
-          <option key={o} value={o}>
-            {o}
-          </option>
-        ))}
-      </select>
-    </label>
-  );
-}
 
 function Reasoning({ children }: { children: React.ReactNode }) {
   return (
@@ -126,12 +143,20 @@ function Reasoning({ children }: { children: React.ReactNode }) {
 /* ── Step 1 — the search-parameter form ────────────────────────────────────── */
 
 interface SearchParams {
-  origin: string;
-  destination: string;
-  carrier: string;
-  equipment: string;
-  mode: string;
-  sailing: string;
+  origin: Leg;
+  destination: Leg;
+  /** Service provider — rate sources searched. */
+  platforms: string[];
+  onlineCarriers: string[];
+  cutoff: string; // yyyy-mm-dd
+  incoterm: string;
+  customer: ContactSummary | null;
+  valueAddedServices: string[];
+  salesPerson: string;
+  currency: string;
+  /** Rates to show: buy, sell or both. */
+  pricingLevel: 'buy' | 'sell' | 'both';
+  load: Load;
 }
 
 function SearchForm({
@@ -143,26 +168,149 @@ function SearchForm({
   onChange: (p: SearchParams) => void;
   onSearch: () => void;
 }) {
-  const set = (k: keyof SearchParams) => (v: string) => onChange({ ...params, [k]: v });
+  const set =
+    (k: 'cutoff' | 'incoterm') => (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) =>
+      onChange({ ...params, [k]: e.target.value });
   return (
     <div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <TextField label="Origin" value={params.origin} onChange={set('origin')} />
-        <TextField label="Destination" value={params.destination} onChange={set('destination')} />
-        <SelectField label="Carrier" value={params.carrier} onChange={set('carrier')} options={carriers} />
-        <SelectField label="Equipment type" value={params.equipment} onChange={set('equipment')} options={equipmentTypes} />
-        <SelectField label="Mode" value={params.mode} onChange={set('mode')} options={['FCL', 'LCL']} />
-        <TextField label="Target sailing" value={params.sailing} onChange={set('sailing')} />
+      {/* Top row — mode (drives the lane + load details) on the left, cut-off date on the right. */}
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <span className="t-subhead text-ink">Mode</span>
+          <SegmentedControl
+            aria-label="Shipment mode"
+            value={params.load.mode}
+            onChange={(mode) => onChange({ ...params, load: { ...params.load, mode } })}
+            options={[
+              { value: 'FCL', label: 'FCL' },
+              { value: 'LCL', label: 'LCL' },
+            ]}
+          />
+        </div>
+        <label className="flex items-center gap-3">
+          <span className="t-subhead text-ink">Cut-off date</span>
+          <Input size="sm" type="date" value={params.cutoff} onChange={set('cutoff')} className="w-40" />
+        </label>
       </div>
-      <div className="mt-4 flex items-center gap-3">
-        <button
-          onClick={onSearch}
-          className="flex items-center gap-1.5 rounded-lg bg-ink px-3.5 py-2 text-[14px] font-semibold text-canvas hover:bg-ink/90"
-        >
-          <Search size={15} />
-          Search rates
-        </button>
-        <span className="text-[12px] text-faint">Queries live carrier APIs for matching rates</span>
+      <LaneFields
+        origin={params.origin}
+        destination={params.destination}
+        onChange={(origin, destination) => onChange({ ...params, origin, destination })}
+      />
+      {/* Container queries: columns follow the step pane's width, not the window's. */}
+      <div className="@container mt-4 space-y-4">
+        {/* Left half: service provider (stacked) · right half: load details. */}
+        <div className="grid grid-cols-1 items-start gap-4 @2xl:grid-cols-2">
+          <Card className="@container">
+            <CardHeader>
+              <div className="flex items-center gap-2">
+                <span className="t-subhead text-ink">Service provider</span>
+                <span className="text-[12px] text-faint">
+                  {params.platforms.length} platform{params.platforms.length === 1 ? '' : 's'} ·{' '}
+                  {params.onlineCarriers.length} carrier{params.onlineCarriers.length === 1 ? '' : 's'}
+                </span>
+              </div>
+            </CardHeader>
+            <CardContent className="space-y-3">
+              <Field label="Platform">
+                <GroupedMultiSelect
+                  aria-label="Platform"
+                  value={params.platforms}
+                  onChange={(platforms) => onChange({ ...params, platforms })}
+                  groups={platformGroups}
+                  placeholder="Choose platform rates…"
+                  allLabel="All platforms"
+                />
+              </Field>
+              <Field label="Online carriers">
+                <GroupedMultiSelect
+                  aria-label="Online carriers"
+                  value={params.onlineCarriers}
+                  onChange={(onlineCarriers) => onChange({ ...params, onlineCarriers })}
+                  groups={onlineCarrierGroups}
+                  placeholder="Choose online carriers…"
+                  allLabel="All carriers"
+                />
+              </Field>
+            </CardContent>
+          </Card>
+          <LoadDetails load={params.load} onChange={(load) => onChange({ ...params, load })} />
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 @lg:grid-cols-2">
+          <Field label="Incoterm">
+            <Select value={params.incoterm} onChange={set('incoterm')} options={incoterms} />
+          </Field>
+          <Field label="Pricing level">
+            <SegmentedControl
+              stretch
+              aria-label="Pricing level"
+              value={params.pricingLevel}
+              onChange={(pricingLevel) => onChange({ ...params, pricingLevel })}
+              options={[
+                { value: 'buy', label: 'Buy' },
+                { value: 'sell', label: 'Sell' },
+                { value: 'both', label: 'Both' },
+              ]}
+            />
+          </Field>
+        </div>
+
+        <div className="grid grid-cols-1 gap-3 @lg:grid-cols-2">
+          <Field label="Customer / Contact">
+            <ChipCombobox
+              aria-label="Customer or contact"
+              value={params.customer}
+              onChange={(customer) => onChange({ ...params, customer })}
+              options={contacts}
+              getKey={(c) => c.id}
+              matches={(c, q) => `${c.name} ${c.company} ${c.email}`.toLowerCase().includes(q)}
+              renderItem={(c) => (
+                <>
+                  <User size={13} className="shrink-0 text-muted" />
+                  <span className="truncate font-medium text-ink">{c.name}</span>
+                  <span className="truncate text-faint">{c.company}</span>
+                </>
+              )}
+              placeholder="Search customer or contact…"
+              emptyText="No contacts match"
+            />
+          </Field>
+          <Field label="Value added services">
+            <GroupedMultiSelect
+              aria-label="Value added services"
+              value={params.valueAddedServices}
+              onChange={(valueAddedServices) => onChange({ ...params, valueAddedServices })}
+              groups={valueAddedServiceGroups}
+              placeholder="None"
+              allLabel="All services"
+            />
+          </Field>
+        </div>
+      </div>
+
+      {/* Action bar — sales person + currency sit with the search as key context for the rates. */}
+      <div className="@container mt-5 border-t border-line pt-4">
+        <div className="flex flex-wrap items-end justify-end gap-3">
+          <Field label="Sales person" className="w-full @md:w-52">
+            <Select
+              value={params.salesPerson}
+              onChange={(e) => onChange({ ...params, salesPerson: e.target.value })}
+              options={salesPeople}
+            />
+          </Field>
+          <Field label="Search currency" className="w-full @md:w-32">
+            <Select
+              value={params.currency}
+              onChange={(e) => onChange({ ...params, currency: e.target.value })}
+              options={currencies}
+            />
+          </Field>
+          <Button onClick={onSearch} title="Queries platform rates and online carriers" className="@max-md:w-full">
+            <Search size={15} />
+            Search rates
+          </Button>
+        </div>
       </div>
       <Reasoning>
         Atlas ran this search across carriers and returned <strong className="text-ink">12 rates</strong> for the lane
@@ -172,110 +320,64 @@ function SearchForm({
   );
 }
 
-/* ── Quote Assistant (left pane on Finalize pricing) ───────────────────────── */
+/* ── Step 3 footer ─────────────────────────────────────────────────────────── */
 
-function QuoteAssistant({
-  charges,
-  setCharges,
-  margin,
-  setMargin,
+/** Pinned to the bottom of the step pane (outside the scroller): summary + the two quote actions. */
+function QuoteFooter({
+  count,
+  sells,
+  currency,
+  withCommon,
+  onDraftQuote,
+  onNewQuote,
 }: {
-  charges: Charge[];
-  setCharges: React.Dispatch<React.SetStateAction<Charge[]>>;
-  margin: number;
-  setMargin: (m: number) => void;
+  count: number;
+  /** All-in sell per selected rate. */
+  sells: number[];
+  currency: string;
+  withCommon: boolean;
+  /** Review a draft first (step 4). */
+  onDraftQuote: () => void;
+  /** Create the quote and go to send (step 5). */
+  onNewQuote: () => void;
 }) {
-  const update = (id: string, patch: Partial<Charge>) =>
-    setCharges((cs) => cs.map((c) => (c.id === id ? { ...c, ...patch } : c)));
-  const remove = (id: string) => setCharges((cs) => cs.filter((c) => c.id !== id));
-  const add = () => setCharges((cs) => [...cs, { id: `c${Date.now()}`, label: 'New charge', value: 0 }]);
-
+  const fmt = (n: number) => n.toLocaleString('en-US');
+  const lo = Math.min(...sells);
+  const hi = Math.max(...sells);
   return (
-    <div className="flex h-full w-[40%] min-w-[340px] shrink-0 flex-col border-r border-line">
-      <div className="flex items-center gap-2 border-b border-line px-4 py-3">
-        <span className="grid size-7 place-items-center rounded-lg border border-atlas/40 text-atlas">
-          <Sparkles size={15} />
+    <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-line-strong bg-subtle px-5 py-3 shadow-[0_-6px_12px_-8px_rgba(0,0,0,0.6)]">
+      <span className="text-[12px] text-muted">
+        <span className="text-ink">
+          {count} rate{count === 1 ? '' : 's'}
         </span>
-        <div>
-          <h3 className="text-[14px] font-semibold text-ink">Quote Assistant</h3>
-          <p className="text-[10px] text-faint">Edit charges & add margin — applies to every option</p>
-        </div>
+        {count > 0 && (
+          <>
+            {' '}
+            · all-in sell {currency} {lo === hi ? fmt(lo) : `${fmt(lo)} – ${fmt(hi)}`}
+            {withCommon && <span className="text-faint"> · incl. common charges</span>}
+          </>
+        )}
+      </span>
+      <div className="flex items-center gap-2">
+        <Button variant="outline" onClick={onDraftQuote} disabled={count === 0}>
+          <FileText size={14} /> Create draft quote
+        </Button>
+        <Button onClick={onNewQuote} disabled={count === 0} className="bg-success text-canvas hover:bg-success/90">
+          <Plus size={14} /> Create new quote
+        </Button>
       </div>
+    </div>
+  );
+}
 
-      <div className="flex-1 space-y-6 overflow-y-auto px-4 py-4">
-        {/* Margin */}
-        <section>
-          <div className={labelCls}>Margin</div>
-          <div className="mt-1.5 flex items-center gap-2">
-            <div className="flex items-center rounded-lg border border-line bg-canvas focus-within:border-line-strong">
-              <input
-                type="number"
-                value={margin}
-                onChange={(e) => setMargin(Math.max(0, Number(e.target.value) || 0))}
-                className="w-16 bg-transparent px-3 py-2 text-[14px] text-ink outline-none"
-              />
-              <span className="pr-3 text-[14px] text-faint">%</span>
-            </div>
-            <div className="flex gap-1">
-              {[0, 10, 12, 15].map((m) => (
-                <button
-                  key={m}
-                  onClick={() => setMargin(m)}
-                  className={`rounded-md border px-2 py-1 text-[12px] font-medium ${
-                    margin === m ? 'border-atlas/50 text-atlas' : 'border-line text-muted hover:bg-subtle'
-                  }`}
-                >
-                  {m}%
-                </button>
-              ))}
-            </div>
-          </div>
-          <p className="mt-1.5 text-[10px] text-faint">Marked up on the cost price of each selected option.</p>
-        </section>
-
-        {/* Charges */}
-        <section>
-          <div className="mb-2 flex items-center justify-between">
-            <span className={labelCls}>Charges</span>
-            <button
-              onClick={add}
-              className="flex items-center gap-1 rounded-md border border-line px-2 py-1 text-[12px] font-medium text-ink hover:bg-subtle"
-            >
-              <Plus size={13} /> Add
-            </button>
-          </div>
-          <div className="space-y-2">
-            {charges.map((c) => (
-              <div key={c.id} className="flex items-center gap-2">
-                <input
-                  value={c.label}
-                  onChange={(e) => update(c.id, { label: e.target.value })}
-                  className="min-w-0 flex-1 rounded-lg border border-line bg-canvas px-2.5 py-1.5 text-[12px] text-ink outline-none focus:border-line-strong"
-                />
-                <div className="flex w-24 items-center rounded-lg border border-line bg-canvas focus-within:border-line-strong">
-                  <span className="pl-2 text-[12px] text-faint">$</span>
-                  <input
-                    type="number"
-                    value={c.value}
-                    onChange={(e) => update(c.id, { value: Math.max(0, Number(e.target.value) || 0) })}
-                    className="w-full bg-transparent px-1.5 py-1.5 text-[12px] text-ink outline-none"
-                  />
-                </div>
-                <button
-                  onClick={() => remove(c.id)}
-                  aria-label="Remove charge"
-                  className="grid size-7 shrink-0 place-items-center rounded-md text-faint hover:bg-subtle hover:text-danger"
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            ))}
-          </div>
-          <p className="mt-2 text-[10px] text-faint">
-            Charges are added on top of each carrier’s ocean rate. All cargo is FCL — no LCL lines.
-          </p>
-        </section>
-      </div>
+/** Step 4 footer — quote summary + Send quote, pinned to the bottom of the page. */
+function SendFooter({ summary, valid, onSend }: { summary: React.ReactNode; valid: boolean; onSend: () => void }) {
+  return (
+    <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-line-strong bg-subtle px-5 py-3 shadow-[0_-6px_12px_-8px_rgba(0,0,0,0.6)]">
+      <span className="text-[12px] text-muted">{summary}</span>
+      <Button onClick={onSend} disabled={!valid} className="bg-success text-canvas hover:bg-success/90">
+        <SendHorizontal size={14} /> Send quote
+      </Button>
     </div>
   );
 }
@@ -286,90 +388,73 @@ function StepBody({
   index,
   selected,
   onToggle,
-  charges,
-  margin,
+  lines,
+  pricingLevel,
+  recap,
+  onClearSelection,
+  onViewSearch,
+  onCreateQuote,
+  legsFor,
+  effective,
+  chargeOpsFor,
+  onAskAtlas,
+  common,
+  canExtractCommon,
+  onExtractCommon,
+  onRestoreCommon,
+  commonOps,
+  quote,
+  sent,
 }: {
   index: number;
   selected: string[];
   onToggle: (carrier: string) => void;
-  charges: Charge[];
-  margin: number;
+  /** Searched equipment (step 1 load) — drives the price columns and ocean cost. */
+  lines: SearchLine[];
+  pricingLevel: PricingLevel;
+  /** Search recap for the results header (lane, date, cargo, currency…). */
+  recap: SearchRecap;
+  onClearSelection: () => void;
+  onViewSearch: () => void;
+  onCreateQuote: () => void;
+  /** Current (possibly edited) charges for a rate. */
+  legsFor: (r: RateCard) => LegCharges[];
+  /** Rate with its ocean-freight prices taken from the edited charges. */
+  effective: (r: RateCard) => RateCard;
+  chargeOpsFor: (rateId: string) => ChargeOps;
+  /** Open the agent panel scoped to one rate, or to all selected rates (null). */
+  onAskAtlas: (r: RateCard | null) => void;
+  /** Extracted common charges (step 3), or null. */
+  common: CommonExtraction | null;
+  /** Whether the selected rates share any identical charge (enables Extract). */
+  canExtractCommon: boolean;
+  onExtractCommon: () => void;
+  onRestoreCommon: () => void;
+  commonOps: ChargeOps;
+  /** Step 5 — what was sent and the search behind it. */
+  sent: {
+    quote: { fileName: string; to: string[]; contact: string; start: string; expiry: string; today: string };
+    searchFacts: { label: string; value: string }[];
+  };
+  /** Step 4 — draft quote: PDF file name + validity dates. */
+  quote: { fileName: string; start: string; expiry: string; onStart: (v: string) => void; onExpiry: (v: string) => void };
 }) {
-  const chargesTotal = charges.reduce((a, c) => a + c.value, 0);
-  const primary = rateCards.find((r) => selected.includes(r.carrier)) ?? rateCards[0];
 
   // Step 2 — multi-select rate cards.
   if (index === 1) {
     return (
       <div className="space-y-3">
-        <span className="text-[12px] text-faint">
-          {selected.length} of {rateCards.length} selected · tap to toggle (multi-select)
-        </span>
-
-        {rateCards.map((r) => {
-          const on = selected.includes(r.carrier);
-          const ocean = oceanOf(r);
-          return (
-            <button
-              key={r.carrier}
-              onClick={() => onToggle(r.carrier)}
-              aria-pressed={on}
-              className={`w-full rounded-xl border p-4 text-left transition-colors ${
-                on ? 'border-atlas/50 bg-atlas-bg/15' : 'border-line hover:bg-subtle/40'
-              }`}
-            >
-              <div className="flex items-start justify-between gap-3">
-                <div className="flex items-start gap-3">
-                  <span
-                    className={`mt-0.5 grid size-5 shrink-0 place-items-center rounded-md border ${
-                      on ? 'border-atlas bg-atlas/15 text-atlas' : 'border-line-strong text-transparent'
-                    }`}
-                  >
-                    <Check size={13} strokeWidth={3} />
-                  </span>
-                  <div>
-                    <div className="flex items-center gap-2">
-                      <span className="text-[14px] font-semibold text-ink">{r.carrier} · {r.service}</span>
-                      {r.carrier === 'Maersk' && (
-                        <span className="rounded-full border border-atlas/40 px-2 py-0.5 text-[10px] font-semibold text-atlas">
-                          Atlas pick
-                        </span>
-                      )}
-                    </div>
-                    <div className="mt-0.5 text-[12px] text-muted">{r.route}</div>
-                    <div className="mt-1.5 flex flex-wrap gap-x-5 gap-y-1 text-[12px]">
-                      <span className="text-faint">Transit <span className="font-medium text-ink">{r.transit}</span></span>
-                      <span className="text-faint">Valid until <span className="font-medium text-ink">{r.validUntil}</span></span>
-                    </div>
-                  </div>
-                </div>
-                <div className="shrink-0 text-right">
-                  <div className="text-[16px] font-bold text-ink">{usd(ocean + chargesTotal)}</div>
-                  <div className="text-[10px] text-faint">all-in cost</div>
-                </div>
-              </div>
-
-              {/* Equipment-wise rate split */}
-              <div className="mt-3 overflow-hidden rounded-lg border border-line bg-canvas">
-                <div className="border-b border-line px-3 py-1.5 text-[10px] font-semibold uppercase tracking-wide text-faint">
-                  Equipment-wise rate
-                </div>
-                {r.equipment.map((e) => (
-                  <div key={e.type} className="flex items-center justify-between px-3 py-1.5 text-[12px]">
-                    <span className="text-muted">{e.type} × {e.qty}</span>
-                    <span className="text-ink">
-                      {usd(Math.round(e.subtotal / e.qty))} <span className="text-faint">/unit</span> · {usd(e.subtotal)}
-                    </span>
-                  </div>
-                ))}
-                <div className="flex items-center justify-between border-t border-line px-3 py-1.5 text-[12px]">
-                  <span className="text-muted">Surcharges (THC · BAF · docs)</span>
-                  <span className="text-ink">{usd(chargesTotal)}</span>
-                </div>
-              </div>
-            </button>
-          );
-        })}
+        <SearchResults
+          rates={rateCards}
+          recap={recap}
+          lines={lines}
+          pricingLevel={pricingLevel}
+          selected={selected}
+          onToggle={onToggle}
+          onClearSelection={onClearSelection}
+          onViewSearch={onViewSearch}
+          onCreateQuote={onCreateQuote}
+        />
 
         <Reasoning>
           {selected.length === 0 ? (
@@ -390,7 +475,7 @@ function StepBody({
     );
   }
 
-  // Step 3 — Finalize pricing: every selected option, cost → margin → sell.
+  // Step 3 — Finalize pricing: the selected rate cards, expanded with editable charges.
   if (index === 2) {
     const chosen = rateCards.filter((r) => selected.includes(r.carrier));
     if (chosen.length === 0) {
@@ -398,116 +483,166 @@ function StepBody({
     }
     return (
       <div className="space-y-4">
-        {chosen.map((c, i) => {
-          const ocean = oceanOf(c);
-          const cost = costOf(c, charges);
-          const sell = sellOf(c, charges, margin);
-          const marginAmt = sell - cost;
-          const isPrimary = i === 0;
-          return (
-            <div
-              key={c.carrier}
-              className={`overflow-hidden rounded-xl border ${isPrimary ? 'border-atlas/50' : 'border-line'}`}
-            >
-              <div className="flex items-center justify-between border-b border-line px-4 py-2.5">
-                <div className="flex items-center gap-2">
-                  <span className="text-[14px] font-semibold text-ink">{c.carrier} · {c.service}</span>
-                  {isPrimary && (
-                    <span className="rounded-full border border-atlas/40 px-2 py-0.5 text-[10px] font-semibold text-atlas">
-                      Primary
-                    </span>
-                  )}
-                  <span className="text-[12px] text-faint">· {c.transit} · valid {c.validUntil}</span>
-                </div>
-                <div className="text-right">
-                  <div className="text-[16px] font-bold text-ink">{usd(sell)}</div>
-                  <div className="text-[10px] text-faint">sell price</div>
-                </div>
-              </div>
-              <div className="px-4 py-1">
-                <div className="flex items-center justify-between py-1.5 text-[14px]">
-                  <span className="text-muted">Ocean freight ({c.equipment.map((e) => `${e.type} ×${e.qty}`).join(', ')})</span>
-                  <span className="text-ink">{usd(ocean)}</span>
-                </div>
-                {charges.map((ch) => (
-                  <div key={ch.id} className="flex items-center justify-between py-1.5 text-[14px]">
-                    <span className="text-muted">{ch.label}</span>
-                    <span className="text-ink">{usd(ch.value)}</span>
-                  </div>
-                ))}
-                <div className="flex items-center justify-between border-t border-line py-1.5 text-[14px]">
-                  <span className="font-medium text-ink">Cost subtotal</span>
-                  <span className="font-medium text-ink">{usd(cost)}</span>
-                </div>
-                <div className="flex items-center justify-between py-1.5 text-[14px]">
-                  <span className="text-muted">Margin ({margin}%)</span>
-                  <span className={margin > 0 ? 'text-atlas' : 'text-faint'}>+{usd(marginAmt)}</span>
-                </div>
-              </div>
-              <div className="flex items-center justify-between border-t border-line bg-subtle/40 px-4 py-2.5">
-                <span className="text-[14px] font-semibold text-ink">Sell price · 14-day validity</span>
-                <span className="text-[16px] font-bold text-ink">{usd(sell)}</span>
-              </div>
-            </div>
-          );
-        })}
-        <Reasoning>
-          Charges and margin are set in the <strong className="text-ink">Quote Assistant</strong> on the left and apply
-          to all {chosen.length > 1 ? `${chosen.length} options` : 'options'}. Current margin:{' '}
-          <strong className="text-ink">{margin}%</strong>.
-        </Reasoning>
-      </div>
-    );
-  }
-
-  // Step 4 — Draft quote.
-  if (index === 3) {
-    const sell = sellOf(primary, charges, margin);
-    return (
-      <div className="space-y-4">
-        <div className="rounded-lg border border-line p-4">
-          <div className="flex items-center gap-2 text-[14px] font-semibold text-ink">
-            <FileText size={16} className="text-muted" /> Quote #{deal.linked.quote.id}.pdf
+        {/* Pinned search recap + equipment columns, aligned with the cards' prices */}
+        <StickyHeader>
+          <RecapRow recap={recap} lines={lines} onViewSearch={onViewSearch} />
+          <div className="px-5 py-1.5">
+            <PriceHeader
+              currency={recap.currency}
+              lines={lines}
+              left={`${chosen.length} selected rate${chosen.length === 1 ? '' : 's'} · Carrier · schedule`}
+            />
           </div>
-          <dl className="mt-3 space-y-2 text-[14px]">
-            <div className="flex justify-between"><dt className="text-faint">Prepared for</dt><dd className="text-ink">{deal.contact.name} · {deal.company}</dd></div>
-            <div className="flex justify-between"><dt className="text-faint">Carrier</dt><dd className="text-ink">{primary.carrier} · {primary.service}{selected.length > 1 ? ` (+${selected.length - 1} option${selected.length > 2 ? 's' : ''})` : ''}</dd></div>
-            <div className="flex justify-between"><dt className="text-faint">Trade lane</dt><dd className="text-ink">{deal.tradeLane.origin} → {deal.tradeLane.destination}</dd></div>
-            <div className="flex justify-between"><dt className="text-faint">Valid until</dt><dd className="text-ink">31 Dec 2026</dd></div>
-            <div className="flex justify-between"><dt className="text-faint">Total (incl. {margin}% margin)</dt><dd className="font-semibold text-ink">{usd(sell)}</dd></div>
-          </dl>
+        </StickyHeader>
+
+        {chosen.map((r) => (
+          <RateResultCard
+            key={r.rateId}
+            rate={effective(r)}
+            lines={lines}
+            pricingLevel={pricingLevel}
+            selected
+            onToggle={() => onToggle(r.carrier)}
+            bls={recap.bls}
+            legs={legsFor(r)}
+            chargeOps={chargeOpsFor(r.rateId)}
+            defaultExpanded
+            onAskAtlas={() => onAskAtlas(r)}
+          />
+        ))}
+
+        {/* Always visible below the cards; disabled (with a reason) when it can't apply. */}
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-dashed border-line px-3 py-2">
+          <span className="text-[12px] text-faint">
+            {common
+              ? 'Common charges are shown below — restore them from that table.'
+              : chosen.length < 2
+                ? 'Select two or more rates to extract the charges they share.'
+                : canExtractCommon
+                  ? 'Pull charges that are identical on every selected rate into one table.'
+                  : 'No charge is identical across the selected rates.'}
+          </span>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onExtractCommon}
+            disabled={!canExtractCommon}
+            className="border-atlas/50 text-atlas hover:bg-atlas/10"
+          >
+            {common ? <Check size={14} /> : <Layers size={14} />}
+            {common ? 'Common charges extracted' : 'Extract common charges'}
+          </Button>
         </div>
-        <div className="rounded-lg border border-line p-4">
-          <div className="text-[10px] font-semibold uppercase tracking-wide text-faint">Email draft</div>
-          <p className="mt-2 text-[14px] leading-relaxed text-ink/90">
-            Hi {deal.contact.name}, please find attached our all-in ocean freight quote for{' '}
-            {deal.tradeLane.origin} → {deal.tradeLane.destination}, {deal.equipment}. Rate is valid for 14 days and
-            includes THC at both ends.
-          </p>
-        </div>
+
+        {common && (
+          <CommonChargesCard
+            legs={common.legs}
+            lines={lines}
+            bls={recap.bls}
+            currency={recap.currency}
+            rateCount={Object.keys(Object.values(common.origin)[0] ?? {}).length}
+            ops={commonOps}
+            onRestore={onRestoreCommon}
+          />
+        )}
+
       </div>
     );
   }
 
-  // Step 5 — Send quote.
+  // Step 4 — Draft quote: PDF preview, PDF configuration, validity (email draft is in the left pane).
+  if (index === 3) {
+    return (
+      <QuoteDraftStep
+        fileName={quote.fileName}
+        start={quote.start}
+        expiry={quote.expiry}
+        onStart={quote.onStart}
+        onExpiry={quote.onExpiry}
+      />
+    );
+  }
+
+  // Step 5 — Quote sent: summary, search parameters, quoted rates and next action.
   return (
-    <div className="rounded-lg border border-line p-4">
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-2 text-[14px] font-semibold text-ink">
-          <SendHorizontal size={16} className="text-muted" /> {deal.linked.thread.subject}
-        </div>
-        <span className="inline-flex items-center gap-1 rounded-full border border-success/40 px-2 py-0.5 text-[10px] font-medium text-success">
-          <Check size={11} /> Sent · 4d ago
-        </span>
+    <QuoteSentSummary
+      quote={sent.quote}
+      searchFacts={sent.searchFacts}
+      rates={rateCards.filter((r) => selected.includes(r.carrier)).map(effective)}
+      legsFor={legsFor}
+      common={common?.legs ?? null}
+      lines={lines}
+      bls={recap.bls}
+      currency={recap.currency}
+      pricingLevel={pricingLevel}
+    />
+  );
+}
+
+/* ── Resizable left pane ───────────────────────────────────────────────────── */
+
+/** Left pane bounds, as % of the tab width. Min = 2 of the stepper's 5 columns. */
+const LEFT_MIN = 40;
+const LEFT_MAX = 70;
+const clampLeft = (pct: number) => Math.min(LEFT_MAX, Math.max(LEFT_MIN, pct));
+
+/** Left pane with a drag handle on its right edge (arrow keys also resize). */
+function ResizablePane({
+  width,
+  onResize,
+  children,
+}: {
+  width: number;
+  onResize: (pct: number) => void;
+  children: React.ReactNode;
+}) {
+  const paneRef = useRef<HTMLDivElement>(null);
+  const [dragging, setDragging] = useState(false);
+
+  const onPointerDown = (e: React.PointerEvent) => {
+    const container = paneRef.current?.parentElement;
+    if (!container) return;
+    e.preventDefault();
+    const { left, width: total } = container.getBoundingClientRect();
+    setDragging(true);
+    const onMove = (ev: PointerEvent) => onResize(clampLeft(((ev.clientX - left) / total) * 100));
+    const onUp = () => {
+      setDragging(false);
+      window.removeEventListener('pointermove', onMove);
+      window.removeEventListener('pointerup', onUp);
+    };
+    window.addEventListener('pointermove', onMove);
+    window.addEventListener('pointerup', onUp);
+  };
+
+  return (
+    <div ref={paneRef} className="relative flex shrink-0 flex-col border-r border-line" style={{ width: `${width}%` }}>
+      {children}
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize left pane"
+        aria-valuenow={Math.round(width)}
+        aria-valuemin={LEFT_MIN}
+        aria-valuemax={LEFT_MAX}
+        tabIndex={0}
+        onPointerDown={onPointerDown}
+        onDoubleClick={() => onResize(LEFT_MIN)}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowLeft') onResize(clampLeft(width - 2));
+          if (e.key === 'ArrowRight') onResize(clampLeft(width + 2));
+        }}
+        className="group absolute inset-y-0 -right-1.5 z-10 w-3 cursor-col-resize outline-none"
+      >
+        <span
+          className={cn(
+            'absolute inset-y-0 left-1/2 w-px -translate-x-1/2 transition-colors group-hover:bg-line-strong group-focus-visible:bg-line-strong',
+            dragging && 'bg-ink group-hover:bg-ink',
+          )}
+        />
       </div>
-      <dl className="mt-3 space-y-2 text-[14px]">
-        <div className="flex justify-between"><dt className="text-faint">To</dt><dd className="text-ink">{deal.contact.email}</dd></div>
-        <div className="flex justify-between"><dt className="text-faint">Attachment</dt><dd className="text-ink">Quote #{deal.linked.quote.id}.pdf</dd></div>
-        <div className="flex justify-between"><dt className="text-faint">Mode</dt><dd className="text-ink">Auto-sent after preview window</dd></div>
-      </dl>
-      <Reasoning>
-        Delivered to the customer. In manual mode, this is the final approval gate before anything leaves your outbox.
-      </Reasoning>
+      {/* Keeps the cursor + stops text selection across the page while dragging. */}
+      {dragging && <div className="fixed inset-0 z-50 cursor-col-resize select-none" />}
     </div>
   );
 }
@@ -518,101 +653,272 @@ export function EnquiryTab() {
   const firstOpen = steps.findIndex((s) => s.status !== 'done');
   const [active, setActive] = useState(firstOpen === -1 ? 0 : firstOpen);
   const [emailOpen, setEmailOpen] = useState(true);
+  const [leftWidth, setLeftWidth] = useState(LEFT_MIN);
   const [selectedCarriers, setSelectedCarriers] = useState<string[]>(['Maersk']);
-  const [charges, setCharges] = useState<Charge[]>(initialCharges);
-  const [margin, setMargin] = useState(0);
+  // Step 3 edits — per rate, the (edited) leg charges. Ref keeps Atlas handlers on the latest copy.
+  const [edited, setEdited] = useState<Record<string, LegCharges[]>>({});
+  const editedRef = useRef(edited);
+  useEffect(() => {
+    editedRef.current = edited;
+  }, [edited]);
+  const { askAtlas } = useAgent();
   const [params, setParams] = useState<SearchParams>({
-    origin: `${deal.tradeLane.origin} · Nhava Sheva`,
-    destination: `${deal.tradeLane.destination} · Hamburg`,
-    carrier: 'All carriers',
-    equipment: "40'HC ×9",
-    mode: 'FCL',
-    sailing: 'Early November 2026',
+    origin: {
+      mode: 'door',
+      door: doorLocations[0],
+      port: portByCode(deal.tradeLane.origin),
+      nearby: [],
+      localCharges: true,
+    },
+    destination: { mode: 'cy', door: null, port: portByCode(deal.tradeLane.destination), nearby: [], localCharges: false },
+    customer: contacts.find((c) => c.email === deal.contact.email) ?? null,
+    valueAddedServices: ['export-customs', 'insurance'],
+    salesPerson: 'Varun Reddy',
+    currency: 'USD',
+    platforms: ['contract'],
+    onlineCarriers: ['maersk', 'hapag'],
+    cutoff: '2026-11-02',
+    incoterm: 'FCA — Free Carrier',
+    pricingLevel: 'sell',
+    load: {
+      mode: 'FCL',
+      // Sample with all four equipment types (the max) to show multi-column pricing.
+      containers: [
+        { id: 'cl1', type: "20'GP", qty: 2, weightKg: 18000 },
+        { id: 'cl2', type: "40'GP", qty: 3, weightKg: 24000 },
+        { id: 'cl3', type: "40'HC", qty: 9, weightKg: 22000 },
+        { id: 'cl4', type: "45'HC", qty: 1, weightKg: 26000 },
+      ],
+      lcl: {
+        method: 'total',
+        total: { packages: 0, volumeCbm: 0, weightKg: 0 },
+        units: [{ id: 'u1', qty: 1, l: 120, w: 100, h: 100, weightKg: 0 }],
+        pallets: [{ id: 'p1', type: 'Euro 120×80', qty: 1, h: 150, weightKg: 0 }],
+      },
+      cargoType: 'General cargo',
+      billsOfLading: 1,
+    },
   });
+
+  const legsFor = (r: RateCard) => edited[r.rateId] ?? chargeBreakdown(r);
+  /** Card prices follow the edited ocean-freight line. */
+  const effective = (r: RateCard): RateCard => {
+    const of = legsFor(r).find((l) => l.key === 'ocean')?.charges.find((c) => c.id === 'ocean-0')?.perUnit; // first ocean line = ocean freight
+    return of ? { ...r, prices: of } : r;
+  };
+  // Step 4 — quote validity (start today, 14 days by default).
+  const [quoteStart, setQuoteStart] = useState(() => addDaysIso(new Date().toISOString().slice(0, 10), 0));
+  const [quoteExpiry, setQuoteExpiry] = useState(() => addDaysIso(new Date().toISOString().slice(0, 10), 14));
+  const quoteFile = `Quote #${deal.linked.quote.id}.pdf`;
+  const fmtDate = (iso: string) =>
+    new Date(`${iso}T00:00:00`).toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' });
+
+  const quoteSells = () => {
+    const commonSell = common
+      ? allInOf(common.legs, params.load.containers, params.load.billsOfLading, params.currency).sell
+      : 0;
+    return chosenRates.map(
+      (r) => allInOf(legsFor(r), params.load.containers, params.load.billsOfLading, params.currency).sell + commonSell,
+    );
+  };
+
+  // Common charges pulled out of several rates (step 3).
+  const [common, setCommon] = useState<CommonExtraction | null>(null);
+  const chosenRates = rateCards.filter((r) => selectedCarriers.includes(r.carrier));
+  const types = params.load.containers.map((l) => l.type);
+  const legsByRate = () => Object.fromEntries(chosenRates.map((r) => [r.rateId, legsFor(r)]));
+  const canExtractCommon = chosenRates.length > 1 && !common && extractCommon(legsByRate(), types) !== null;
+  const onExtractCommon = () => {
+    const res = extractCommon(legsByRate(), types);
+    if (!res) return;
+    setEdited((prev) => ({ ...prev, ...res.byRate }));
+    setCommon(res.extraction);
+  };
+  const onRestoreCommon = () => {
+    if (!common) return;
+    const ids = Object.keys(Object.values(common.origin)[0] ?? {});
+    const byRate = Object.fromEntries(
+      ids.map((id) => [id, edited[id] ?? chargeBreakdown(rateCards.find((r) => r.rateId === id)!)]),
+    );
+    setEdited((prev) => ({ ...prev, ...restoreCommon(byRate, common) }));
+    setCommon(null);
+  };
+  // Atlas's quote email for step 4 (built from the selected rates + validity).
+  const quoteDraft: QuoteDraft | undefined = (() => {
+    if (!chosenRates.length) return undefined;
+    const sells = quoteSells();
+    const cheapest = Math.min(...sells).toLocaleString('en-US');
+    const equipment = params.load.containers.map((l) => `${l.qty}× ${l.type}`).join(', ');
+    const pol = params.origin.port?.code ?? deal.tradeLane.origin;
+    const pod = params.destination.port?.code ?? deal.tradeLane.destination;
+    return {
+      to: [params.customer?.email ?? deal.contact.email],
+      cc: [],
+      subject: `Quote ${deal.linked.quote.id} · ${pol} → ${pod}`,
+      body: [
+        `Hi ${(params.customer?.name ?? deal.contact.name).split(' ')[0]},`,
+        `Thank you for the enquiry. Please find attached our quote for ${pol} → ${pod} (${equipment}), with ${chosenRates.length} carrier option${chosenRates.length === 1 ? '' : 's'} — all-in from ${params.currency} ${cheapest}.`,
+        `The quote is valid from ${fmtDate(quoteStart)} to ${fmtDate(quoteExpiry)} and includes the charges listed per leg in the attachment.`,
+        'Happy to walk through the options or hold space on your preferred sailing.',
+        'Best regards,\nVarun',
+      ].join('\n\n'),
+      attachment: { label: quoteFile, meta: `PDF · ${chosenRates.length} option${chosenRates.length === 1 ? '' : 's'}` },
+    };
+  })();
+
+  // Step 5 — search parameters as readable label / value pairs.
+  const optionLabels = (groups: MultiSelectGroup[], values: string[]) => {
+    const all = groups.flatMap((g) => g.options);
+    return values.map((v) => all.find((o) => o.value === v)?.label ?? v).join(', ') || '—';
+  };
+  const legText = (leg: Leg) =>
+    leg.mode === 'door'
+      ? `${leg.door ? `${leg.door.name} ${leg.door.pincode}` : 'Door'} → ${leg.port?.code ?? '—'}`
+      : `${leg.port ? `${leg.port.name} (${leg.port.code})` : '—'} · CY`;
+  const [today] = useState(() => new Date().toISOString().slice(0, 10));
+  const sent = {
+    quote: {
+      fileName: quoteFile,
+      to: quoteDraft?.to ?? [deal.contact.email],
+      contact: params.customer?.name ?? deal.contact.name,
+      start: quoteStart,
+      expiry: quoteExpiry,
+      today,
+    },
+    searchFacts: [
+      { label: 'Customer', value: params.customer ? `${params.customer.name} · ${params.customer.company}` : '—' },
+      { label: 'Mode', value: params.load.mode },
+      { label: 'Origin', value: legText(params.origin) },
+      { label: 'Destination', value: legText(params.destination) },
+      { label: 'Equipment', value: params.load.containers.map((l) => `${l.qty}× ${l.type}`).join(', ') },
+      { label: 'Cargo type', value: params.load.cargoType },
+      { label: 'Incoterm', value: params.incoterm.split(' — ')[0] },
+      { label: 'Cut-off date', value: fmtDate(params.cutoff) },
+      { label: 'No. of B/Ls', value: String(params.load.billsOfLading) },
+      { label: 'Platform', value: optionLabels(platformGroups, params.platforms) },
+      { label: 'Online carriers', value: optionLabels(onlineCarrierGroups, params.onlineCarriers) },
+      { label: 'Value added services', value: optionLabels(valueAddedServiceGroups, params.valueAddedServices) },
+      { label: 'Pricing level', value: params.pricingLevel === 'both' ? 'Buy & sell' : params.pricingLevel === 'buy' ? 'Buy' : 'Sell' },
+      { label: 'Sales person', value: params.salesPerson },
+      { label: 'Currency', value: params.currency },
+    ],
+  };
+
+  const commonOps: ChargeOps = {
+    replace: (legKey, id, next) => setCommon((c) => c && { ...c, legs: replaceCharge(c.legs, legKey, id, next) }),
+    add: (legKey, charge) => setCommon((c) => c && { ...c, legs: addCharge(c.legs, legKey, charge) }),
+    remove: (legKey, id) => setCommon((c) => c && { ...c, legs: removeCharge(c.legs, legKey, id) }),
+  };
+
+  /** Edit operations for one rate's charges — each applies to its (edited) copy. */
+  const chargeOpsFor = (rateId: string): ChargeOps => {
+    const r = rateCards.find((x) => x.rateId === rateId)!;
+    const mutate = (fn: (legs: LegCharges[]) => LegCharges[]) =>
+      setEdited((prev) => ({ ...prev, [rateId]: fn(prev[rateId] ?? chargeBreakdown(r)) }));
+    return {
+      replace: (legKey, id, next) => mutate((l) => replaceCharge(l, legKey, id, next)),
+      add: (legKey, charge) => mutate((l) => addCharge(l, legKey, charge)),
+      remove: (legKey, id) => mutate((l) => removeCharge(l, legKey, id)),
+    };
+  };
+  /** Scope the agent panel to one rate (or every selected rate) and open it. */
+  const askAtlasFor = (target: RateCard | null) => {
+    const targets = target ? [target] : rateCards.filter((r) => selectedCarriers.includes(r.carrier));
+    askAtlas({
+      label: target ? `Editing ${target.carrier} · ${target.rateId}` : `Editing ${targets.length} selected rates`,
+      hint: 'I can change sell (or buy) charges and recalculate the totals.',
+      suggestions: ['Apply 12% margin', 'Add 150 to destination THC', 'Waive seal fee', 'Reduce ocean freight by 200'],
+      handle: (text) => {
+        let summary: string | null = null;
+        const next = { ...editedRef.current };
+        for (const r of targets) {
+          const res = runChargeCommand(next[r.rateId] ?? chargeBreakdown(r), text);
+          if (res) {
+            next[r.rateId] = res.legs;
+            summary = res.summary;
+          }
+        }
+        if (!summary) return null;
+        setEdited(next);
+        return targets.length > 1 ? `${summary} (${targets.length} rates)` : summary;
+      },
+    });
+  };
 
   const toggleCarrier = (c: string) =>
     setSelectedCarriers((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]));
 
   const step = steps[active];
   const StepIcon = step.icon;
-  // Left pane: email on steps 1 & 5, Quote Assistant on step 3 (finalize pricing).
-  const leftMode: 'email' | 'assistant' | null =
-    active === 2 ? 'assistant' : active === 0 || active === 4 ? 'email' : null;
+  // Left pane: email on steps 1, 4 (with Atlas's quote draft) & 5.
+  const leftMode: 'email' | null = active === 0 || active === 3 || active === 4 ? 'email' : null;
 
   return (
     <div className="flex h-full flex-col bg-surface">
-      {/* Header */}
-      <div className="flex items-center justify-between border-b border-line px-5 py-3">
-        <div className="flex items-center gap-2">
-          <span className="grid size-7 place-items-center rounded-lg border border-atlas/40 text-atlas">
-            <Sparkles size={15} />
-          </span>
-          <div>
-            <h2 className="text-[16px] font-semibold text-ink">Enquiry</h2>
-            <p className="text-[12px] text-faint">The 5 steps Atlas ran to quote this enquiry · review or step in</p>
-          </div>
-        </div>
-      </div>
-
-      {/* Stepper */}
-      <div className="flex items-center gap-1 border-b border-line px-5 py-3">
+      {/* Stepper — equal-width bordered steps; connectors sit in the gaps between them. */}
+      <ol className="flex items-center border-b border-line px-5 py-3">
         {steps.map((m, i) => {
           const done = m.status === 'done';
           const on = i === active;
           const Icon = m.icon;
           return (
-            <div key={m.label} className="flex flex-1 items-center gap-1">
-              <button
-                onClick={() => setActive(i)}
-                className={`flex min-w-0 flex-1 items-center gap-2.5 rounded-lg border px-3 py-2 text-left transition-colors ${
-                  on ? 'border-line-strong bg-subtle' : 'border-transparent hover:bg-subtle/60'
-                }`}
-              >
-                <span
-                  className={`grid size-7 shrink-0 place-items-center rounded-full border bg-transparent ${
-                    done ? 'border-atlas/50 text-atlas' : on ? 'border-ink text-ink' : 'border-line-strong text-faint'
-                  }`}
+            <Fragment key={m.label}>
+              <li className="min-w-0 flex-1 basis-0">
+                <button
+                  onClick={() => setActive(i)}
+                  aria-current={on ? 'step' : undefined}
+                  className={cn(
+                    'flex w-full min-w-0 items-center justify-center gap-2 rounded-lg border px-3 py-2 transition-colors',
+                    on ? 'border-line-strong bg-subtle' : 'border-line hover:border-line-strong hover:bg-subtle/60',
+                  )}
                 >
-                  {done ? <Check size={14} strokeWidth={3} /> : <Icon size={14} />}
-                </span>
-                <span className="min-w-0">
-                  <span className={`block truncate text-[12px] font-semibold ${on ? 'text-ink' : 'text-muted'}`}>
+                  <span
+                    className={cn(
+                      'grid size-6 shrink-0 place-items-center rounded-full border',
+                      done ? 'border-atlas/50 text-atlas' : on ? 'border-ink text-ink' : 'border-line-strong text-faint',
+                    )}
+                  >
+                    {done ? <Check size={13} strokeWidth={3} /> : <Icon size={13} />}
+                  </span>
+                  <span className={cn('truncate text-[12px] font-semibold', on ? 'text-ink' : 'text-muted')}>
                     {m.label}
                   </span>
-                  <span className="block truncate text-[10px] text-faint">{m.sub}</span>
-                </span>
-              </button>
-              {i < steps.length - 1 && <span className="h-px w-3 shrink-0 bg-line" />}
-            </div>
+                </button>
+              </li>
+              {/* Connector — fills the gap between two step borders, never overlapping them. */}
+              {i < steps.length - 1 && (
+                <li aria-hidden className={cn('mx-1.5 h-px w-6 shrink-0', done ? 'bg-atlas/50' : 'bg-line')} />
+              )}
+            </Fragment>
           );
         })}
-      </div>
+      </ol>
 
       {/* Two-pane body */}
       <div className="flex min-h-0 flex-1">
-        {leftMode === 'assistant' && (
-          <QuoteAssistant charges={charges} setCharges={setCharges} margin={margin} setMargin={setMargin} />
-        )}
-
         {leftMode === 'email' &&
           (emailOpen ? (
-            <div className="flex w-[38%] min-w-[320px] shrink-0 flex-col border-r border-line">
+            <ResizablePane width={leftWidth} onResize={setLeftWidth}>
               <div className="flex items-center justify-between border-b border-line px-4 py-2">
                 <span className="flex items-center gap-1.5 text-[12px] font-semibold text-muted">
                   <Mail size={13} /> Email thread
                 </span>
-                <button
+                <Button
+                  variant="ghost"
+                  size="icon-xs"
                   onClick={() => setEmailOpen(false)}
                   aria-label="Collapse email thread"
-                  className="grid size-7 place-items-center rounded-md text-muted hover:bg-subtle"
                 >
                   <PanelLeftClose size={16} />
-                </button>
+                </Button>
               </div>
               <div className="min-h-0 flex-1">
-                <EmailThread />
+                <EmailThread
+                  quoteDraft={active === 3 ? quoteDraft : undefined}
+                  onSendQuote={() => setActive(4)}
+                />
               </div>
-            </div>
+            </ResizablePane>
           ) : (
             <button
               onClick={() => setEmailOpen(true)}
@@ -630,19 +936,31 @@ export function EnquiryTab() {
           ))}
 
         <div className="flex min-h-0 flex-1 flex-col">
-          <div className="flex-1 overflow-y-auto px-5 py-5">
-            <div className="mb-3 flex items-center gap-2">
+          {/* No top padding on the scroller (it lives on the title) so sticky headers sit flush at the top. */}
+          <div className="flex-1 overflow-y-auto px-5 pb-5">
+            <div className="mb-3 flex items-center gap-2 pt-5">
               <StepIcon size={16} className="text-muted" />
               <h3 className="text-[16px] font-semibold text-ink">
                 Step {active + 1} · {step.label}
               </h3>
               {step.status === 'done' && (
-                <span className="inline-flex items-center gap-1 rounded-full border border-success/40 px-2 py-0.5 text-[10px] font-medium text-success">
+                <Chip tone="success">
                   <Check size={11} /> Completed
-                </span>
+                </Chip>
+              )}
+              {/* Step 3 — opens the agent panel scoped to every selected rate. */}
+              {active === 2 && (
+                <Button
+                  size="sm"
+                  onClick={() => askAtlasFor(null)}
+                  className="ml-auto bg-atlas text-canvas hover:bg-atlas/90"
+                >
+                  <Sparkles size={14} /> Edit with Atlas
+                </Button>
               )}
             </div>
-            <p className="mb-4 text-[14px] text-muted">{step.detail}</p>
+            {/* Step 3 has no info line — its Atlas button sits in the header above. */}
+            {active !== 2 ? <p className="mb-4 text-[14px] text-muted">{step.detail}</p> : <div className="mb-4" />}
             {active === 0 ? (
               <SearchForm params={params} onChange={setParams} onSearch={() => setActive(1)} />
             ) : (
@@ -650,39 +968,64 @@ export function EnquiryTab() {
                 index={active}
                 selected={selectedCarriers}
                 onToggle={toggleCarrier}
-                charges={charges}
-                margin={margin}
+                legsFor={legsFor}
+                effective={effective}
+                chargeOpsFor={chargeOpsFor}
+                common={common}
+                canExtractCommon={canExtractCommon}
+                onExtractCommon={onExtractCommon}
+                onRestoreCommon={onRestoreCommon}
+                commonOps={commonOps}
+                quote={{ fileName: quoteFile, start: quoteStart, expiry: quoteExpiry, onStart: setQuoteStart, onExpiry: setQuoteExpiry }}
+                sent={sent}
+                onAskAtlas={askAtlasFor}
+                lines={params.load.containers}
+                pricingLevel={params.pricingLevel}
+                recap={{
+                  mode: params.load.mode,
+                  pol: params.origin.port,
+                  pod: params.destination.port,
+                  cutoff: params.cutoff,
+                  cargoType: params.load.cargoType,
+                  customer: params.customer?.company,
+                  bls: params.load.billsOfLading,
+                  currency: params.currency,
+                }}
+                onClearSelection={() => setSelectedCarriers([])}
+                onViewSearch={() => setActive(0)}
+                onCreateQuote={() => setActive(2)}
               />
             )}
           </div>
-        </div>
-      </div>
 
-      {/* Footer — human-in-the-loop controls */}
-      <div className="flex items-center justify-between border-t border-line px-5 py-3">
-        <span className="text-[12px] text-faint">Manual mode: approve each step before Atlas continues</span>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={() => setActive((i) => Math.max(0, i - 1))}
-            disabled={active === 0}
-            className="flex items-center gap-1 rounded-lg border border-line bg-surface px-3 py-1.5 text-[14px] font-medium text-ink hover:bg-subtle disabled:opacity-30"
-          >
-            <ChevronLeft size={15} /> Back
-          </button>
-          {active < steps.length - 1 ? (
-            <button
-              onClick={() => setActive((i) => Math.min(steps.length - 1, i + 1))}
-              className="flex items-center gap-1 rounded-lg bg-ink px-3 py-1.5 text-[14px] font-semibold text-canvas hover:bg-ink/90"
-            >
-              Approve & continue <ChevronRight size={15} />
-            </button>
-          ) : (
-            <span className="inline-flex items-center gap-1 rounded-full border border-success/40 px-3 py-1.5 text-[14px] font-medium text-success">
-              <Check size={14} /> Run complete
-            </span>
+          {/* Step 3 footer — outside the scroller, so it always sits at the bottom of the page */}
+          {active === 2 && (
+            <QuoteFooter
+              count={chosenRates.length}
+              sells={quoteSells()}
+              currency={params.currency}
+              withCommon={!!common}
+              onDraftQuote={() => setActive(3)}
+              onNewQuote={() => setActive(4)}
+            />
+          )}
+
+          {/* Step 4 footer — send the quote */}
+          {active === 3 && (
+            <SendFooter
+              valid={chosenRates.length > 0 && quoteExpiry > quoteStart}
+              summary={
+                <>
+                  <span className="text-ink">{quoteFile}</span> · {chosenRates.length} option
+                  {chosenRates.length === 1 ? '' : 's'} · valid {fmtDate(quoteStart)} – {fmtDate(quoteExpiry)}
+                </>
+              }
+              onSend={() => setActive(4)}
+            />
           )}
         </div>
       </div>
+
     </div>
   );
 }

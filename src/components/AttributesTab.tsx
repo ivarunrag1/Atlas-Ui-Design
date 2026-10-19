@@ -1,4 +1,6 @@
 import { type DealSummary } from '../data/deals';
+import { Card } from '@/components/ui/card';
+import { SectionLabel } from '@/components/ui/field';
 
 export function AttributesTab({ deal }: { deal: DealSummary }) {
   const groups: { title: string; rows: [string, string][] }[] = [
@@ -46,15 +48,17 @@ export function AttributesTab({ deal }: { deal: DealSummary }) {
       <div className="flex-1 space-y-6 overflow-y-auto px-5 py-5">
         {groups.map((g) => (
           <section key={g.title}>
-            <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-wide text-faint">{g.title}</h3>
-            <div className="divide-y divide-line overflow-hidden rounded-xl border border-line">
+            <SectionLabel as="h3" className="mb-2">
+              {g.title}
+            </SectionLabel>
+            <Card className="divide-y divide-line overflow-hidden">
               {g.rows.map(([k, v]) => (
                 <div key={k} className="grid grid-cols-[160px_1fr] gap-4 px-4 py-2.5 text-[14px]">
                   <span className="text-faint">{k}</span>
                   <span className="text-ink">{v}</span>
                 </div>
               ))}
-            </div>
+            </Card>
           </section>
         ))}
       </div>

@@ -1,8 +1,46 @@
 import { useState } from 'react';
-import { PanelRightClose, SendHorizontal } from 'lucide-react';
+import { PanelRightClose, Sparkles, X } from 'lucide-react';
 import { agentChat, type Activity, type ChatMessage } from '../data/deal';
-import { Avatar } from './ui';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Conversation, ConversationContent, ConversationScrollButton } from '@/components/ui/ai/conversation';
+import { Message, MessageAvatar, MessageContent, MessageMeta } from '@/components/ui/ai/message';
+import {
+  PromptInput,
+  PromptInputSubmit,
+  PromptInputTextarea,
+  PromptInputToolbar,
+  PromptInputTools,
+} from '@/components/ui/ai/prompt-input';
+import { Suggestion, Suggestions } from '@/components/ui/ai/suggestion';
 import { ActivityItem } from './activity';
+import { useAgent, type AgentScope } from '@/lib/agent-context';
+
+/** Reply when the panel is scoped (e.g. to a rate's charges) — acts, then reports. */
+function buildScopedReply(now: number, scope: AgentScope, result: string | null): Activity {
+  return result
+    ? {
+        id: `tr${now}`,
+        type: 'chat',
+        actor: 'atlas',
+        title: 'Updated charges',
+        detail: result,
+        timestamp: 'Just now',
+        steps: [
+          { label: 'Parsed request', detail: 'Understood the change', status: 'done' },
+          { label: 'Matched charges', detail: scope.label, status: 'done' },
+          { label: 'Recalculated totals', detail: 'Unit, equipment and shipment totals updated', status: 'done' },
+        ],
+      }
+    : {
+        id: `tr${now}`,
+        type: 'chat',
+        actor: 'atlas',
+        title: "Couldn't map that to a charge",
+        detail: `Try one of: ${(scope.suggestions ?? []).join(' · ')}`,
+        timestamp: 'Just now',
+      };
+}
 
 /** Builds the agent's (simulated) reply as an activity-style trace. */
 function buildReply(now: number): Activity {
@@ -32,17 +70,20 @@ export function AgentChat({
 }) {
   const [chat, setChat] = useState<ChatMessage[]>(agentChat);
   const [input, setInput] = useState('');
+  const { scope, clearScope } = useAgent();
 
-  function send() {
-    const text = input.trim();
+  function send(override?: string) {
+    const text = (override ?? input).trim();
     if (!text) return;
     const now = Date.now();
     setChat((c) => [...c, { id: `u${now}`, from: 'you', timestamp: 'Just now', body: text }]);
     setInput('');
     // Simulated agent response — rendered activity-style, and recorded to the
-    // mid-section activity log. Replace with a real agent call.
+    // mid-section activity log. When scoped, Atlas acts on the scope (e.g. edits
+    // charges). Replace with a real agent call.
+    const acted = scope?.handle ? scope.handle(text) : undefined;
     setTimeout(() => {
-      const reply = buildReply(now);
+      const reply = scope?.handle ? buildScopedReply(now, scope, acted ?? null) : buildReply(now);
       setChat((c) => [...c, { id: `k${now}`, from: 'atlas', timestamp: 'Just now', trace: reply }]);
       onRecord(reply);
     }, 700);
@@ -55,7 +96,7 @@ export function AgentChat({
       {/* Header */}
       <div className="flex items-center justify-between border-b border-line px-5 py-3">
         <div className="flex items-center gap-2">
-          <Avatar initials="A" actor="atlas" size={30} />
+          <MessageAvatar name="Atlas" fallback={<Sparkles size={14} />} className="size-8 border-atlas/40 text-atlas" />
           <div>
             <h2 className="text-[16px] font-semibold leading-tight text-ink">Ask Atlas</h2>
             <p className="flex items-center gap-1 text-[12px] text-faint">
@@ -63,67 +104,81 @@ export function AgentChat({
             </p>
           </div>
         </div>
-        <button
-          onClick={onClose}
-          aria-label="Close agent chat"
-          className="grid size-8 place-items-center rounded-lg text-muted hover:bg-subtle"
-        >
+        <Button variant="ghost" size="icon-sm" onClick={onClose} aria-label="Close agent chat">
           <PanelRightClose size={18} />
-        </button>
+        </Button>
       </div>
 
       {/* Conversation */}
-      <div className="flex flex-1 flex-col gap-4 overflow-y-auto px-5 py-4">
-        {chat.map((m) =>
-          m.from === 'you' ? (
-            <div key={m.id} className="flex flex-row-reverse gap-2">
-              <div className="max-w-[82%] rounded-xl border border-line bg-subtle px-3 py-2 text-[14px] leading-snug text-ink">
-                <p>{m.body}</p>
-                <div className="mt-1 text-[10px] text-faint">{m.timestamp}</div>
-              </div>
-            </div>
-          ) : m.trace ? (
-            // Agent response — shown the same way as an activity entry.
-            <div key={m.id} className="rounded-xl border border-line bg-subtle/40 p-3">
-              <ActivityItem item={m.trace} />
-            </div>
-          ) : (
-            <div key={m.id} className="flex gap-2">
-              <Avatar initials="A" actor="atlas" size={28} />
-              <div className="max-w-[82%] rounded-xl border border-line bg-subtle px-3 py-2 text-[14px] leading-snug text-ink">
-                <p>{m.body}</p>
-                <div className="mt-1 text-[10px] text-faint">{m.timestamp}</div>
-              </div>
-            </div>
-          )
-        )}
-      </div>
+      <Conversation>
+        <ConversationContent>
+          {chat.map((m) =>
+            m.from === 'you' ? (
+              <Message key={m.id} from="user">
+                <MessageContent>
+                  <p>{m.body}</p>
+                  <MessageMeta>{m.timestamp}</MessageMeta>
+                </MessageContent>
+              </Message>
+            ) : m.trace ? (
+              // Agent response — shown the same way as an activity entry.
+              <Message key={m.id} from="assistant">
+                <MessageContent>
+                  <ActivityItem item={m.trace} stacked />
+                </MessageContent>
+              </Message>
+            ) : (
+              <Message key={m.id} from="assistant">
+                <MessageAvatar name="Atlas" fallback={<Sparkles size={12} />} className="border-atlas/40 text-atlas" />
+                <MessageContent>
+                  <p>{m.body}</p>
+                  <MessageMeta>{m.timestamp}</MessageMeta>
+                </MessageContent>
+              </Message>
+            ),
+          )}
+        </ConversationContent>
+        <ConversationScrollButton />
+      </Conversation>
 
-      {/* Composer */}
-      <div className="border-t border-line p-3">
-        <div className="flex items-end gap-2 rounded-xl border border-line bg-canvas p-2 focus-within:border-line-strong">
-          <textarea
+      {/* Composer — with the current scope (set by an "Ask Atlas" button) above it */}
+      <div className="space-y-2 border-t border-line p-3">
+        {scope && (
+          <div className="space-y-2 rounded-lg border border-atlas/40 bg-atlas/10 p-2">
+            <div className="flex items-start gap-2">
+              <Badge variant="atlas" className="mt-px">
+                <Sparkles /> Context
+              </Badge>
+              <span className="min-w-0 flex-1 text-[12px] leading-tight">
+                <span className="block truncate text-ink">{scope.label}</span>
+                {scope.hint && <span className="block text-[10px] text-muted">{scope.hint}</span>}
+              </span>
+              <Button variant="ghost" size="icon-xs" onClick={clearScope} aria-label="Clear context" className="size-5 text-muted">
+                <X size={12} />
+              </Button>
+            </div>
+            {scope.suggestions && (
+              <Suggestions>
+                {scope.suggestions.map((s) => (
+                  <Suggestion key={s} suggestion={s} onClick={send} />
+                ))}
+              </Suggestions>
+            )}
+          </div>
+        )}
+        <PromptInput onSubmit={() => send()}>
+          <PromptInputTextarea
             value={input}
             onChange={(e) => setInput(e.target.value)}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                send();
-              }
-            }}
-            rows={1}
-            placeholder="Message Atlas…  (↵ to send)"
-            className="max-h-28 min-h-[24px] flex-1 resize-none bg-transparent px-2 py-1 text-[14px] text-ink outline-none placeholder:text-faint"
+            placeholder={scope ? 'Ask Atlas to change these charges…' : 'Message Atlas…'}
           />
-          <button
-            onClick={send}
-            disabled={!input.trim()}
-            aria-label="Send message"
-            className="grid size-8 shrink-0 place-items-center rounded-lg bg-ink text-canvas hover:bg-ink/90 disabled:opacity-30"
-          >
-            <SendHorizontal size={16} />
-          </button>
-        </div>
+          <PromptInputToolbar>
+            <PromptInputTools>
+              <span className="px-1 text-[10px] text-faint">↵ to send · ⇧↵ new line</span>
+            </PromptInputTools>
+            <PromptInputSubmit disabled={!input.trim()} />
+          </PromptInputToolbar>
+        </PromptInput>
       </div>
     </aside>
   );

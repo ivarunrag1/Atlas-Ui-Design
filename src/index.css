@@ -37,6 +37,7 @@
 
   /* Temperature */
   --color-hot: #3abc80;
+  --color-warm: #d97706;
   --color-cold: #3b82f6;
   --color-cold-bg: #16223d;
 
@@ -64,11 +65,14 @@ body {
   line-height: 1.45;
 }
 
-/* Placeholder text — 14px italic */
-input::placeholder,
-textarea::placeholder {
-  font-style: italic;
-  font-size: 14px;
+/* Placeholder text — 14px italic. In the base layer so per-control utilities
+   (e.g. the xs Input's 12px placeholder) can override it. */
+@layer base {
+  input::placeholder,
+  textarea::placeholder {
+    font-style: italic;
+    font-size: 14px;
+  }
 }
 
 /* ------------------------------------------------------------------ *

@@ -1,30 +1,9 @@
 import { useState } from 'react';
-import { AlertTriangle, Ship, Container, Pencil, Check, X } from 'lucide-react';
+import { AlertTriangle, Ship, Container } from 'lucide-react';
 import { stageColor, type DealSummary } from '../data/deals';
-
-const labelCls = 'text-[10px] font-medium uppercase tracking-[0.04em] text-faint';
-
-function Fact({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div className="flex flex-col gap-0.5">
-      <span className={labelCls}>{label}</span>
-      <span className="text-[14px] font-medium text-ink">{children}</span>
-    </div>
-  );
-}
-
-function Field({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
-  return (
-    <label className="flex flex-col gap-1">
-      <span className="t-label text-muted">{label}</span>
-      <input
-        value={value}
-        onChange={(e) => onChange(e.target.value)}
-        className="rounded-lg border border-line bg-canvas px-3 py-1.5 text-[14px] text-ink outline-none focus:border-line-strong"
-      />
-    </label>
-  );
-}
+import { Input } from '@/components/ui/input';
+import { Field } from '@/components/ui/field';
+import { InfoPane, InfoHeader, InfoSection, EditActions, FactGrid, Fact } from '@/components/ui/info-pane';
 
 export function DealInfoPane({ deal }: { deal: DealSummary }) {
   const base = { name: deal.contact, role: deal.contactRole, email: deal.contactEmail };
@@ -42,10 +21,8 @@ export function DealInfoPane({ deal }: { deal: DealSummary }) {
   };
 
   return (
-    <aside className="flex w-[300px] shrink-0 flex-col overflow-y-auto border-r border-line bg-surface">
-      {/* Identity */}
-      <div className="px-5 py-4">
-        <h2 className="t-page text-ink">{deal.company}</h2>
+    <InfoPane storageKey="atlas.dealInfoPane.v2">
+      <InfoHeader title={deal.company}>
         <div className="mt-2 flex flex-wrap items-center gap-2">
           <span className="inline-flex items-center gap-1.5 rounded-full border border-line px-2 py-0.5 text-[12px] font-medium text-muted">
             <span className="size-2 rounded-full" style={{ background: stageColor[deal.stage] }} />
@@ -57,40 +34,21 @@ export function DealInfoPane({ deal }: { deal: DealSummary }) {
             </span>
           )}
         </div>
-      </div>
+      </InfoHeader>
 
-      {/* Customer */}
-      <div className="border-t border-line px-5 py-4">
-        <div className="mb-2 flex items-center justify-between">
-          <span className={labelCls}>Customer</span>
-          {!editing && (
-            <button
-              onClick={startEdit}
-              className="flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[12px] font-medium text-faint hover:bg-subtle hover:text-ink"
-            >
-              <Pencil size={12} /> Edit
-            </button>
-          )}
-        </div>
+      <InfoSection title="Customer" onEdit={startEdit} editing={editing}>
         {editing ? (
           <div className="space-y-2.5">
-            <Field label="Contact" value={draft.name} onChange={(v) => setDraft({ ...draft, name: v })} />
-            <Field label="Role" value={draft.role} onChange={(v) => setDraft({ ...draft, role: v })} />
-            <Field label="Email" value={draft.email} onChange={(v) => setDraft({ ...draft, email: v })} />
-            <div className="flex items-center gap-2 pt-1">
-              <button
-                onClick={save}
-                className="flex items-center gap-1.5 rounded-lg bg-ink px-3 py-1.5 text-[14px] font-semibold text-canvas hover:bg-ink/90"
-              >
-                <Check size={14} /> Save
-              </button>
-              <button
-                onClick={() => setEditing(false)}
-                className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-[14px] font-medium text-muted hover:bg-subtle"
-              >
-                <X size={14} /> Cancel
-              </button>
-            </div>
+            <Field label="Contact">
+              <Input value={draft.name} onChange={(e) => setDraft({ ...draft, name: e.target.value })} />
+            </Field>
+            <Field label="Role">
+              <Input value={draft.role} onChange={(e) => setDraft({ ...draft, role: e.target.value })} />
+            </Field>
+            <Field label="Email">
+              <Input value={draft.email} onChange={(e) => setDraft({ ...draft, email: e.target.value })} />
+            </Field>
+            <EditActions onSave={save} onCancel={() => setEditing(false)} />
           </div>
         ) : (
           <div className="space-y-0.5">
@@ -101,33 +59,35 @@ export function DealInfoPane({ deal }: { deal: DealSummary }) {
             </a>
           </div>
         )}
-      </div>
+      </InfoSection>
 
       {/* Business / shipment */}
-      <div className="space-y-4 border-t border-line px-5 py-4">
-        <Fact label="Deal value">
-          <span className="text-[18px] font-bold">{deal.value}</span>
-        </Fact>
-        <Fact label="Trade lane">
-          <span className="inline-flex items-center gap-1.5">
-            <Ship size={15} className="text-muted" />
-            {deal.origin} → {deal.destination}
-          </span>
-        </Fact>
-        <Fact label="Containers">
-          <span className="inline-flex items-center gap-1.5">
-            <Container size={15} className="text-muted" />
-            {deal.teu} · {deal.equipment}
-          </span>
-        </Fact>
-        <Fact label="Owner">{deal.owner}</Fact>
-        <Fact label="Deal ID">
-          <span className="text-[14px] font-medium text-muted">{deal.id}</span>
-        </Fact>
-        <Fact label="Last updated">
-          <span className="text-[14px] font-medium text-muted">{deal.updated}</span>
-        </Fact>
-      </div>
-    </aside>
+      <InfoSection>
+        <FactGrid>
+          <Fact label="Deal value">
+            <span className="text-[18px] font-bold">{deal.value}</span>
+          </Fact>
+          <Fact label="Trade lane">
+            <span className="inline-flex items-center gap-1.5">
+              <Ship size={15} className="text-muted" />
+              {deal.origin} → {deal.destination}
+            </span>
+          </Fact>
+          <Fact label="Containers">
+            <span className="inline-flex items-center gap-1.5">
+              <Container size={15} className="text-muted" />
+              {deal.teu} · {deal.equipment}
+            </span>
+          </Fact>
+          <Fact label="Owner">{deal.owner}</Fact>
+          <Fact label="Deal ID">
+            <span className="text-muted">{deal.id}</span>
+          </Fact>
+          <Fact label="Last updated">
+            <span className="text-muted">{deal.updated}</span>
+          </Fact>
+        </FactGrid>
+      </InfoSection>
+    </InfoPane>
   );
 }

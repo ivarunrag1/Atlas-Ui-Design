@@ -1,5 +1,6 @@
 import { Sparkles } from 'lucide-react';
 import type { Actor } from '../data/deal';
+import { cn } from '@/lib/utils';
 
 /**
  * Actor → colour mapping. Minimal treatment: outlined (stroke) accents on a
@@ -25,7 +26,7 @@ export function Avatar({
   const isAgent = actor === 'atlas';
   return (
     <div
-      className={`grid shrink-0 place-items-center rounded-full border bg-transparent font-semibold ${s.border} ${s.fg}`}
+      className={cn('grid shrink-0 place-items-center rounded-full border bg-transparent font-semibold', s.border, s.fg)}
       style={{ width: size, height: size, fontSize: size * 0.4 }}
       title={s.label}
     >
@@ -51,7 +52,10 @@ export function Chip({
   };
   return (
     <span
-      className={`inline-flex items-center gap-1 rounded-full border bg-transparent px-2 py-0.5 text-[10px] font-medium tracking-[0.02em] ${tones[tone]}`}
+      className={cn(
+        'inline-flex items-center gap-1 rounded-full border bg-transparent px-2 py-0.5 text-[10px] font-medium tracking-[0.02em]',
+        tones[tone],
+      )}
     >
       {children}
     </span>
@@ -62,7 +66,7 @@ export function Chip({
 export function TempSignal({ temperature }: { temperature: 'Hot' | 'Warm' | 'Cold' }) {
   const config = {
     Hot: { active: 3, color: 'var(--color-hot)' },
-    Warm: { active: 1, color: '#d97706' },
+    Warm: { active: 1, color: 'var(--color-warm)' },
     Cold: { active: 1, color: 'var(--color-cold)' },
   }[temperature];
   return (
@@ -81,22 +85,5 @@ export function TempSignal({ temperature }: { temperature: 'Hot' | 'Warm' | 'Col
       </span>
       <span className="text-[14px] font-semibold text-ink">{temperature}</span>
     </span>
-  );
-}
-
-export function IconButton({
-  children,
-  label,
-}: {
-  children: React.ReactNode;
-  label: string;
-}) {
-  return (
-    <button
-      aria-label={label}
-      className="grid size-9 place-items-center rounded-lg border border-line bg-surface text-muted transition-colors hover:bg-subtle"
-    >
-      {children}
-    </button>
   );
 }

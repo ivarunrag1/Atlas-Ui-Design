@@ -11,6 +11,7 @@ import { ContactTabs } from './components/ContactTabs';
 import { activity, type Activity } from './data/deal';
 import { type DealSummary } from './data/deals';
 import { type ContactSummary } from './data/contacts';
+import { AgentProvider, type AgentScope } from './lib/agent-context';
 
 type View = 'pipeline' | 'deal' | 'contacts' | 'contact';
 
@@ -39,53 +40,65 @@ export default function App() {
   const recordActivity = (a: Activity) => setLog((l) => [a, ...l]);
 
   const [chatOpen, setChatOpen] = useState(true);
+  // What the agent panel is scoped to — set by "Ask Atlas" buttons anywhere in the app.
+  const [agentScope, setAgentScope] = useState<AgentScope | null>(null);
+  const agent = {
+    scope: agentScope,
+    askAtlas: (scope: AgentScope) => {
+      setAgentScope(scope);
+      setChatOpen(true);
+    },
+    clearScope: () => setAgentScope(null),
+  };
 
   return (
-    <div className="flex h-screen bg-canvas text-ink">
-      <Sidebar active={activeNav} onNavigate={navigate} />
+    <AgentProvider value={agent}>
+      <div className="flex h-screen bg-canvas text-ink">
+        <Sidebar active={activeNav} onNavigate={navigate} />
 
-      {view === 'pipeline' && <DealsView onOpenDeal={openDeal} />}
-      {view === 'contacts' && <ContactsView onOpenContact={openContact} />}
+        {view === 'pipeline' && <DealsView onOpenDeal={openDeal} />}
+        {view === 'contacts' && <ContactsView onOpenContact={openContact} />}
 
-      {view === 'deal' && selectedDeal && (
-        <>
-          <div className="flex min-w-0 flex-1 flex-col">
-            <TopBar
-              section="Pipeline"
-              title={selectedDeal.company}
-              badge={selectedDeal.id}
-              chatOpen={chatOpen}
-              onToggleChat={() => setChatOpen((v) => !v)}
-              onBack={() => setView('pipeline')}
-            />
-            <div className="flex min-h-0 flex-1">
-              <DealInfoPane key={selectedDeal.id} deal={selectedDeal} />
-              <DealTabs key={selectedDeal.id} deal={selectedDeal} activityLog={log} />
+        {view === 'deal' && selectedDeal && (
+          <>
+            <div className="flex min-w-0 flex-1 flex-col">
+              <TopBar
+                section="Pipeline"
+                title={selectedDeal.company}
+                badge={selectedDeal.id}
+                chatOpen={chatOpen}
+                onToggleChat={() => setChatOpen((v) => !v)}
+                onBack={() => setView('pipeline')}
+              />
+              <div className="flex min-h-0 flex-1">
+                <DealInfoPane key={selectedDeal.id} deal={selectedDeal} />
+                <DealTabs key={selectedDeal.id} deal={selectedDeal} activityLog={log} />
+              </div>
             </div>
-          </div>
-          <AgentChat open={chatOpen} onClose={() => setChatOpen(false)} onRecord={recordActivity} />
-        </>
-      )}
+            <AgentChat open={chatOpen} onClose={() => setChatOpen(false)} onRecord={recordActivity} />
+          </>
+        )}
 
-      {view === 'contact' && selectedContact && (
-        <>
-          <div className="flex min-w-0 flex-1 flex-col">
-            <TopBar
-              section="Contacts"
-              title={selectedContact.name}
-              badge={selectedContact.company}
-              chatOpen={chatOpen}
-              onToggleChat={() => setChatOpen((v) => !v)}
-              onBack={() => setView('contacts')}
-            />
-            <div className="flex min-h-0 flex-1">
-              <ContactInfoPane key={selectedContact.id} contact={selectedContact} />
-              <ContactTabs key={selectedContact.id} contact={selectedContact} onOpenDeal={openDeal} />
+        {view === 'contact' && selectedContact && (
+          <>
+            <div className="flex min-w-0 flex-1 flex-col">
+              <TopBar
+                section="Contacts"
+                title={selectedContact.name}
+                badge={selectedContact.company}
+                chatOpen={chatOpen}
+                onToggleChat={() => setChatOpen((v) => !v)}
+                onBack={() => setView('contacts')}
+              />
+              <div className="flex min-h-0 flex-1">
+                <ContactInfoPane key={selectedContact.id} contact={selectedContact} />
+                <ContactTabs key={selectedContact.id} contact={selectedContact} onOpenDeal={openDeal} />
+              </div>
             </div>
-          </div>
-          <AgentChat open={chatOpen} onClose={() => setChatOpen(false)} onRecord={recordActivity} />
-        </>
-      )}
-    </div>
+            <AgentChat open={chatOpen} onClose={() => setChatOpen(false)} onRecord={recordActivity} />
+          </>
+        )}
+      </div>
+    </AgentProvider>
   );
 }

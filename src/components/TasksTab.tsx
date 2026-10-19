@@ -1,6 +1,9 @@
 import { useState } from 'react';
 import { Check, AlertTriangle, Calendar, Plus } from 'lucide-react';
 import type { ContactSummary } from '../data/contacts';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface Task {
   id: string;
@@ -30,9 +33,9 @@ export function TasksTab({ contact }: { contact: ContactSummary }) {
             {open} open · for {contact.name}
           </p>
         </div>
-        <button className="flex items-center gap-1.5 rounded-lg border border-line bg-surface px-3 py-1.5 text-[14px] font-medium text-ink hover:bg-subtle">
+        <Button variant="secondary">
           <Plus size={14} /> Add task
-        </button>
+        </Button>
       </div>
 
       <div className="flex-1 space-y-2 overflow-y-auto px-5 py-4">
@@ -40,16 +43,12 @@ export function TasksTab({ contact }: { contact: ContactSummary }) {
           const w = t.due.toLowerCase();
           const urgent = !t.done && (w.includes('today') || w.includes('overdue'));
           return (
-            <div key={t.id} className="flex items-center gap-3 rounded-lg border border-line bg-canvas px-4 py-3">
-              <button
-                onClick={() => toggle(t.id)}
+            <Card key={t.id} className="flex items-center gap-3 px-4 py-3">
+              <Checkbox
+                checked={t.done}
+                onCheckedChange={() => toggle(t.id)}
                 aria-label={t.done ? 'Mark incomplete' : 'Mark complete'}
-                className={`grid size-5 shrink-0 place-items-center rounded-md border ${
-                  t.done ? 'border-ink bg-ink text-canvas' : 'border-line-strong text-transparent hover:border-ink'
-                }`}
-              >
-                <Check size={13} strokeWidth={3} />
-              </button>
+              />
               <span className={`min-w-0 flex-1 text-[14px] ${t.done ? 'text-muted line-through' : 'text-ink'}`}>
                 {t.title}
               </span>
@@ -61,7 +60,7 @@ export function TasksTab({ contact }: { contact: ContactSummary }) {
                 {t.done ? <Check size={12} /> : urgent ? <AlertTriangle size={12} /> : <Calendar size={12} />}
                 {t.due}
               </span>
-            </div>
+            </Card>
           );
         })}
       </div>

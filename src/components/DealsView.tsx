@@ -15,9 +15,23 @@ import {
   ArrowUpDown,
   SlidersHorizontal,
   ChevronDown,
-  Check,
 } from 'lucide-react';
 import { deals as seedDeals, stages, stageColor, type DealSummary, type Stage } from '../data/deals';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, cardVariants } from '@/components/ui/card';
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuCheckboxItem,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from '@/components/ui/dropdown-menu';
+import { cn } from '@/lib/utils';
 
 type ViewMode = 'kanban' | 'list';
 type SortKey = 'updated' | 'value' | 'company';
@@ -56,18 +70,6 @@ function StageDot({ stage }: { stage: Stage }) {
   return <span className="size-2 shrink-0 rounded-full" style={{ background: stageColor[stage] }} />;
 }
 
-function CheckBox({ on }: { on: boolean }) {
-  return (
-    <span
-      className={`grid size-4 shrink-0 place-items-center rounded border ${
-        on ? 'border-ink bg-ink text-canvas' : 'border-line-strong text-transparent'
-      }`}
-    >
-      <Check size={11} strokeWidth={3} />
-    </span>
-  );
-}
-
 /* ── Kanban card ───────────────────────────────────────────────────────────── */
 
 function KanbanCard({
@@ -97,14 +99,14 @@ function KanbanCard({
   };
 
   return (
-    <div
+    <Card
+      variant="nested"
+      interactive
       draggable
       onDragStart={onDragStart}
       onDragEnd={onDragEnd}
       onClick={() => onOpen(deal)}
-      className={`cursor-pointer rounded-lg border border-line bg-surface p-3 transition-colors hover:border-line-strong ${
-        dragging ? 'opacity-40' : ''
-      }`}
+      className={cn('p-3', dragging && 'opacity-40')}
       style={{ borderLeftWidth: 3, borderLeftColor: stageColor[deal.stage] }}
     >
       <div className="flex items-start justify-between gap-2">
@@ -139,18 +141,21 @@ function KanbanCard({
         <span className="inline-flex items-center gap-1" title={`${deal.notes} notes`}>
           <StickyNote size={13} /> {deal.notes}
         </span>
-        <button
+        <Button
+          variant="ghost"
+          size="xs"
           onClick={() => setCommenting((v) => !v)}
-          className="ml-auto inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 font-medium hover:bg-subtle hover:text-ink"
+          className="ml-auto h-6 gap-1 px-1.5 text-[10px] text-faint"
           title="Add comment"
         >
           <MessageSquarePlus size={13} /> {deal.comments > 0 ? deal.comments : 'Comment'}
-        </button>
+        </Button>
       </div>
 
       {commenting && (
         <div className="mt-2 flex items-center gap-1.5" onClick={stop}>
-          <input
+          <Input
+            size="xs"
             autoFocus
             value={text}
             onChange={(e) => setText(e.target.value)}
@@ -159,18 +164,14 @@ function KanbanCard({
               if (e.key === 'Escape') setCommenting(false);
             }}
             placeholder="Add a comment…"
-            className="min-w-0 flex-1 rounded-md border border-line bg-canvas px-2 py-1 text-[12px] text-ink outline-none focus:border-line-strong"
+            className="flex-1"
           />
-          <button
-            onClick={submit}
-            aria-label="Post comment"
-            className="grid size-7 shrink-0 place-items-center rounded-md bg-ink text-canvas hover:bg-ink/90"
-          >
+          <Button size="icon-xs" onClick={submit} aria-label="Post comment">
             <Send size={13} />
-          </button>
+          </Button>
         </div>
       )}
-    </div>
+    </Card>
   );
 }
 
@@ -210,10 +211,11 @@ function Kanban({
               setDragId(null);
               setOverStage(null);
             }}
-            style={{ background: '#0c0d10' }}
-            className={`flex w-[290px] shrink-0 flex-col overflow-hidden rounded-xl border transition-colors ${
-              over ? 'border-line-strong' : 'border-line'
-            }`}
+            className={cn(
+              cardVariants(),
+              'flex w-[290px] shrink-0 flex-col overflow-hidden transition-colors',
+              over && 'border-line-strong',
+            )}
           >
             {/* Column header — same frame as the tiles */}
             <div className="flex items-center justify-between border-b border-line px-3 py-2">
@@ -224,13 +226,15 @@ function Kanban({
                   {deals.length}
                 </span>
               </span>
-              <button
+              <Button
+                variant="ghost"
+                size="icon-xs"
                 onClick={() => onAdd(stage)}
                 aria-label={`Add deal to ${stage}`}
-                className="grid size-6 place-items-center rounded-md text-faint hover:bg-subtle hover:text-ink"
+                className="size-6 text-faint"
               >
                 <Plus size={15} />
-              </button>
+              </Button>
             </div>
 
             {/* Tiles */}
@@ -267,8 +271,8 @@ const listCols = 'grid-cols-[1.5fr_1fr_1.1fr_1fr_0.8fr_0.7fr]';
 function List({ rows, onOpen }: { rows: DealSummary[]; onOpen: (d: DealSummary) => void }) {
   return (
     <div className="h-full overflow-y-auto px-5 py-4">
-      <div className="overflow-hidden rounded-xl border border-line">
-        <div className={`grid ${listCols} gap-4 border-b border-line bg-canvas px-4 py-2.5 text-[10px] font-semibold uppercase tracking-wide text-faint`}>
+      <Card className="overflow-hidden">
+        <div className={`grid ${listCols} gap-4 border-b border-line bg-subtle/40 px-4 py-2.5 text-[10px] font-semibold uppercase tracking-[0.04em] text-faint`}>
           <span>Company</span>
           <span>Contact</span>
           <span>Trade lane</span>
@@ -301,7 +305,7 @@ function List({ rows, onOpen }: { rows: DealSummary[]; onOpen: (d: DealSummary) 
         {rows.length === 0 && (
           <div className="grid place-items-center py-10 text-[14px] text-faint">No deals match your filters</div>
         )}
-      </div>
+      </Card>
     </div>
   );
 }
@@ -316,8 +320,6 @@ export function DealsView({ onOpenDeal }: { onOpenDeal: (d: DealSummary) => void
   const [sortBy, setSortBy] = useState<SortKey>('updated');
   const [alertsOnly, setAlertsOnly] = useState(false);
   const [filterStages, setFilterStages] = useState<Set<Stage>>(new Set());
-  const [sortOpen, setSortOpen] = useState(false);
-  const [filterOpen, setFilterOpen] = useState(false);
 
   const move = (id: string, stage: Stage) =>
     setItems((xs) => xs.map((d) => (d.id === id ? { ...d, stage, updated: 'just now' } : d)));
@@ -392,126 +394,95 @@ export function DealsView({ onOpenDeal }: { onOpenDeal: (d: DealSummary) => void
         </div>
 
         <div className="flex items-center gap-2">
-          <div className="flex items-center rounded-lg border border-line bg-canvas px-2.5 py-1.5">
-            <Search size={14} className="text-faint" />
-            <input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search deals…"
-              className="w-36 bg-transparent px-2 text-[14px] text-ink outline-none placeholder:text-faint"
-            />
-          </div>
+          <Input
+            size="sm"
+            start={<Search size={14} />}
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search deals…"
+            className="w-48"
+          />
 
           {/* Sort */}
-          <div className="relative">
-            <button
-              onClick={() => setSortOpen((o) => !o)}
-              className="flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-[14px] font-medium text-ink hover:bg-subtle"
-            >
-              <ArrowUpDown size={14} className="text-muted" />
-              {sortLabel}
-              <ChevronDown size={14} className="text-faint" />
-            </button>
-            {sortOpen && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setSortOpen(false)} />
-                <div className="absolute right-0 z-20 mt-1 w-44 rounded-lg border border-line bg-surface p-1 shadow-xl">
-                  {sortOptions.map((o) => (
-                    <button
-                      key={o.key}
-                      onClick={() => {
-                        setSortBy(o.key);
-                        setSortOpen(false);
-                      }}
-                      className="flex w-full items-center justify-between rounded-md px-2.5 py-1.5 text-[14px] text-ink hover:bg-subtle"
-                    >
-                      {o.label}
-                      {sortBy === o.key && <Check size={14} className="text-ink" />}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
-          </div>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <ArrowUpDown size={14} className="text-muted" />
+                {sortLabel}
+                <ChevronDown size={14} className="text-faint" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent>
+              <DropdownMenuRadioGroup value={sortBy} onValueChange={(v) => setSortBy(v as SortKey)}>
+                {sortOptions.map((o) => (
+                  <DropdownMenuRadioItem key={o.key} value={o.key}>
+                    {o.label}
+                  </DropdownMenuRadioItem>
+                ))}
+              </DropdownMenuRadioGroup>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           {/* Filter */}
-          <div className="relative">
-            <button
-              onClick={() => setFilterOpen((o) => !o)}
-              className="flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-[14px] font-medium text-ink hover:bg-subtle"
-            >
-              <SlidersHorizontal size={14} className="text-muted" />
-              Filter
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="outline" size="sm">
+                <SlidersHorizontal size={14} className="text-muted" />
+                Filter
+                {activeFilters > 0 && (
+                  <span className="grid size-4 place-items-center rounded-full bg-ink text-[10px] font-bold text-canvas">
+                    {activeFilters}
+                  </span>
+                )}
+                <ChevronDown size={14} className="text-faint" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-56">
+              <DropdownMenuCheckboxItem checked={alertsOnly} onCheckedChange={setAlertsOnly}>
+                Alerts only
+              </DropdownMenuCheckboxItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuLabel>Stage</DropdownMenuLabel>
+              {stages.map((s) => (
+                <DropdownMenuCheckboxItem key={s} checked={filterStages.has(s)} onCheckedChange={() => toggleStage(s)}>
+                  <StageDot stage={s} />
+                  {s}
+                </DropdownMenuCheckboxItem>
+              ))}
               {activeFilters > 0 && (
-                <span className="grid size-4 place-items-center rounded-full bg-ink text-[10px] font-bold text-canvas">
-                  {activeFilters}
-                </span>
+                <>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem onSelect={clearFilters} className="font-medium text-muted">
+                    Clear all filters
+                  </DropdownMenuItem>
+                </>
               )}
-              <ChevronDown size={14} className="text-faint" />
-            </button>
-            {filterOpen && (
-              <>
-                <div className="fixed inset-0 z-10" onClick={() => setFilterOpen(false)} />
-                <div className="absolute right-0 z-20 mt-1 w-56 rounded-lg border border-line bg-surface p-1 shadow-xl">
-                  <button
-                    onClick={() => setAlertsOnly((v) => !v)}
-                    className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-[14px] text-ink hover:bg-subtle"
-                  >
-                    <CheckBox on={alertsOnly} />
-                    Alerts only
-                  </button>
-                  <div className="my-1 border-t border-line" />
-                  <div className="px-2.5 py-1 text-[10px] font-semibold uppercase tracking-wide text-faint">Stage</div>
-                  {stages.map((s) => (
-                    <button
-                      key={s}
-                      onClick={() => toggleStage(s)}
-                      className="flex w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-[14px] text-ink hover:bg-subtle"
-                    >
-                      <CheckBox on={filterStages.has(s)} />
-                      <StageDot stage={s} />
-                      {s}
-                    </button>
-                  ))}
-                  {activeFilters > 0 && (
-                    <>
-                      <div className="my-1 border-t border-line" />
-                      <button
-                        onClick={clearFilters}
-                        className="w-full rounded-md px-2.5 py-1.5 text-left text-[14px] font-medium text-muted hover:bg-subtle hover:text-ink"
-                      >
-                        Clear all filters
-                      </button>
-                    </>
-                  )}
-                </div>
-              </>
-            )}
-          </div>
+            </DropdownMenuContent>
+          </DropdownMenu>
 
           {/* Kanban / List toggle */}
           <div className="flex items-center gap-0.5 rounded-lg border border-line p-0.5">
-            <button
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => setMode('kanban')}
-              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[14px] font-medium transition-colors ${
-                mode === 'kanban' ? 'bg-subtle text-ink' : 'text-muted hover:text-ink'
-              }`}
+              className={`rounded-[6px] ${mode === 'kanban' ? 'bg-subtle text-ink' : ''}`}
             >
               <LayoutGrid size={14} /> Kanban
-            </button>
-            <button
+            </Button>
+            <Button
+              variant="ghost"
+              size="sm"
               onClick={() => setMode('list')}
-              className={`flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[14px] font-medium transition-colors ${
-                mode === 'list' ? 'bg-subtle text-ink' : 'text-muted hover:text-ink'
-              }`}
+              className={`rounded-[6px] ${mode === 'list' ? 'bg-subtle text-ink' : ''}`}
             >
               <Rows3 size={14} /> List
-            </button>
+            </Button>
           </div>
 
-          <button className="flex items-center gap-1.5 rounded-lg bg-ink px-3 py-1.5 text-[14px] font-semibold text-canvas hover:bg-ink/90">
+          <Button>
             <Plus size={15} /> New deal
-          </button>
+          </Button>
         </div>
       </header>
 
