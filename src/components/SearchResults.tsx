@@ -33,6 +33,7 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Switch } from '@/components/ui/switch';
 import { cn } from '@/lib/utils';
+import { scrollToTop, useStuck } from '@/lib/use-stuck';
 
 /* ── Search recap (row 1) ──────────────────────────────────────────────────── */
 
@@ -79,12 +80,38 @@ export function RecapRow({
   recap,
   lines,
   onViewSearch,
+  compact = false,
+  extra,
 }: {
   recap: SearchRecap;
   lines: SearchLine[];
   onViewSearch: () => void;
+  /** Condensed single line (header stuck while scrolling). */
+  compact?: boolean;
+  /** Extra actions on the right of the condensed line. */
+  extra?: React.ReactNode;
 }) {
   const equipment = lines.map((l) => `${l.qty}x ${l.type}`).join(', ');
+  if (compact) {
+    return (
+      <div className="flex items-center gap-3 border-b border-line px-5 py-1.5 text-[12px]">
+        <span className="shrink-0 rounded-[4px] bg-atlas/80 px-1.5 text-[10px] font-medium text-canvas">{recap.mode}</span>
+        <span className="flex shrink-0 items-center gap-1 text-ink">
+          {recap.pol?.code ?? '—'} <ArrowRight size={11} className="text-faint" /> {recap.pod?.code ?? '—'}
+        </span>
+        <span className="min-w-0 truncate text-muted">
+          {equipment}
+          {recap.customer && <span className="text-faint"> · {recap.customer}</span>}
+        </span>
+        <span className="ml-auto flex shrink-0 items-center gap-2">
+          {extra}
+          <Button variant="ghost" size="xs" onClick={onViewSearch} className="h-6 text-[12px] text-atlas hover:bg-atlas/10">
+            <Eye size={12} /> View Search
+          </Button>
+        </span>
+      </div>
+    );
+  }
   return (
     <div className="flex flex-wrap items-center justify-between gap-3 border-b border-line px-5 py-2">
       <div className="flex min-w-0 items-center gap-3">
@@ -225,6 +252,8 @@ export function SearchResults({
 }) {
   const [tab, setTab] = useState<Tab>('all');
   const [showTotal, setShowTotal] = useState(false);
+  // Condense the sticky header once it's stuck (scrolled past the top).
+  const [sentinelRef, stuck, sentinel] = useStuck();
   const [sortBy, setSortBy] = useState<SortKey | ''>('');
   const [filters, setFilters] = useState<Set<FilterKey>>(new Set());
 
@@ -273,83 +302,110 @@ export function SearchResults({
   return (
     // 16px between rate cards (and below the sticky header).
     <div className="space-y-4">
-      {/* Sticky header */}
+      <div ref={sentinelRef} aria-hidden className="h-px" />
+      {/* Sticky header — full at the top, condensed to one line once scrolled */}
       <StickyHeader>
-        <RecapRow recap={recap} lines={lines} onViewSearch={onViewSearch} />
-
-        {/* Row 2 — toolbar */}
-        <div className="flex flex-wrap items-center justify-end gap-2 border-b border-line px-5 py-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <Button variant="outline" size="sm" className="border-atlas/50 text-atlas hover:bg-atlas/10">
-              <Sparkles size={14} /> Filter With AI
-            </Button>
-            <Button size="sm" className="bg-atlas text-canvas hover:bg-atlas/90">
-              <Plus size={14} /> Add New Rate
-            </Button>
-
-            <label className="flex cursor-pointer items-center gap-2 px-1 text-[12px] text-muted">
-              <Switch checked={showTotal} onCheckedChange={setShowTotal} aria-label="Show freight total" />
-              Show Freight Total
-            </label>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="text-muted">
-                  <ArrowUpDown size={14} /> Quick Sort
+        <RecapRow
+          recap={recap}
+          lines={lines}
+          onViewSearch={onViewSearch}
+          compact={stuck}
+          extra={
+            stuck && (
+              <>
+                {selected.length > 0 && (
+                  <>
+                    <span className="text-muted">
+                      <span className="text-ink">{selected.length}</span> selected
+                    </span>
+                    <Button size="xs" onClick={onCreateQuote} className="h-6 bg-success text-[12px] text-canvas hover:bg-success/90">
+                      <Zap size={12} /> Create New Quote
+                    </Button>
+                  </>
+                )}
+                <Button variant="outline" size="xs" onClick={() => scrollToTop(sentinel)} className="h-6 text-[12px] text-muted">
+                  <ListFilter size={12} /> Sort & filter
                 </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuRadioGroup value={sortBy} onValueChange={(v) => setSortBy(v as SortKey)}>
-                  {quickSorts.map((q) => (
-                    <DropdownMenuRadioItem key={q.key} value={q.key}>
-                      {q.label}
-                    </DropdownMenuRadioItem>
+              </>
+            )
+          }
+        />
+
+        {/* Row 2 — toolbar (hidden while condensed) */}
+        {!stuck && (
+          <div className="flex flex-wrap items-center justify-end gap-2 border-b border-line px-5 py-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <Button variant="outline" size="sm" className="border-atlas/50 text-atlas hover:bg-atlas/10">
+                <Sparkles size={14} /> Filter With AI
+              </Button>
+              <Button size="sm" className="bg-atlas text-canvas hover:bg-atlas/90">
+                <Plus size={14} /> Add New Rate
+              </Button>
+
+              <label className="flex cursor-pointer items-center gap-2 px-1 text-[12px] text-muted">
+                <Switch checked={showTotal} onCheckedChange={setShowTotal} aria-label="Show freight total" />
+                Show Freight Total
+              </label>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="text-muted">
+                    <ArrowUpDown size={14} /> Quick Sort
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuRadioGroup value={sortBy} onValueChange={(v) => setSortBy(v as SortKey)}>
+                    {quickSorts.map((q) => (
+                      <DropdownMenuRadioItem key={q.key} value={q.key}>
+                        {q.label}
+                      </DropdownMenuRadioItem>
+                    ))}
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="w-44 justify-between font-normal text-muted">
+                    <span className="truncate">{sortBy ? sortLabels[sortBy] : 'Sort by'}</span>
+                    <ChevronDown size={14} className="text-faint" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent>
+                  <DropdownMenuRadioGroup value={sortBy} onValueChange={(v) => setSortBy(v as SortKey)}>
+                    {(Object.keys(sortLabels) as SortKey[]).map((k) => (
+                      <DropdownMenuRadioItem key={k} value={k}>
+                        {sortLabels[k]}
+                      </DropdownMenuRadioItem>
+                    ))}
+                  </DropdownMenuRadioGroup>
+                </DropdownMenuContent>
+              </DropdownMenu>
+
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm" className="border-atlas/50 text-atlas hover:bg-atlas/10">
+                    <ListFilter size={14} /> Filters
+                    {filters.size > 0 && (
+                      <span className="grid size-4 place-items-center rounded-full bg-atlas text-[10px] text-canvas">{filters.size}</span>
+                    )}
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent className="w-60">
+                  <DropdownMenuLabel>Show</DropdownMenuLabel>
+                  {(Object.keys(filterLabels) as FilterKey[]).map((k) => (
+                    <DropdownMenuCheckboxItem key={k} checked={filters.has(k)} onCheckedChange={() => toggleFilter(k)}>
+                      {filterLabels[k]}
+                    </DropdownMenuCheckboxItem>
                   ))}
-                </DropdownMenuRadioGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="w-44 justify-between font-normal text-muted">
-                  <span className="truncate">{sortBy ? sortLabels[sortBy] : 'Sort by'}</span>
-                  <ChevronDown size={14} className="text-faint" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent>
-                <DropdownMenuRadioGroup value={sortBy} onValueChange={(v) => setSortBy(v as SortKey)}>
-                  {(Object.keys(sortLabels) as SortKey[]).map((k) => (
-                    <DropdownMenuRadioItem key={k} value={k}>
-                      {sortLabels[k]}
-                    </DropdownMenuRadioItem>
-                  ))}
-                </DropdownMenuRadioGroup>
-              </DropdownMenuContent>
-            </DropdownMenu>
-
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="outline" size="sm" className="border-atlas/50 text-atlas hover:bg-atlas/10">
-                  <ListFilter size={14} /> Filters
-                  {filters.size > 0 && (
-                    <span className="grid size-4 place-items-center rounded-full bg-atlas text-[10px] text-canvas">{filters.size}</span>
-                  )}
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent className="w-60">
-                <DropdownMenuLabel>Show</DropdownMenuLabel>
-                {(Object.keys(filterLabels) as FilterKey[]).map((k) => (
-                  <DropdownMenuCheckboxItem key={k} checked={filters.has(k)} onCheckedChange={() => toggleFilter(k)}>
-                    {filterLabels[k]}
-                  </DropdownMenuCheckboxItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* Row 3 — selection bar (only with a selection) */}
-        {selected.length > 0 && (
+        {/* Row 3 — selection bar (only with a selection; hidden while condensed) */}
+        {!stuck && selected.length > 0 && (
           <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line bg-atlas/5 px-5 py-2">
             <span className="flex items-center gap-2 text-[14px] text-ink">
               <span className="grid size-5 place-items-center rounded-full bg-ink text-[10px] font-medium text-canvas">

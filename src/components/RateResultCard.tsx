@@ -3,6 +3,7 @@ import {
   AlertTriangle,
   Anchor,
   Calendar,
+  CalendarDays,
   ChevronDown,
   ChevronUp,
   CircleDollarSign,
@@ -85,7 +86,7 @@ function TopBar({
   extra?: React.ReactNode;
 }) {
   return (
-    <div className="flex min-h-8 items-center justify-between gap-3 border-b border-line py-0.5 pr-2 pl-3">
+    <div className="flex items-center justify-between gap-3 border-b border-line py-1.5 pr-2 pl-3">
       <div className="flex min-w-0 flex-wrap items-center gap-x-2.5 gap-y-1 text-[12px] text-muted">
         {!readOnly && (
           <Hint label="Selection" value={selected ? 'Selected for the quote' : 'Not selected — click to add'}>
@@ -148,7 +149,7 @@ function StopView({
   detail,
   label,
   value,
-  children,
+  codeExtra,
 }: {
   icon: LucideIcon;
   code: string;
@@ -156,20 +157,23 @@ function StopView({
   /** Hover label + full value. */
   label: string;
   value: string;
-  children?: React.ReactNode;
+  /** Small element right of the code (e.g. free-days icon) with its own hover. */
+  codeExtra?: React.ReactNode;
 }) {
   return (
     <div className="flex shrink-0 flex-col items-center text-center">
-      <Hint label={label} value={value}>
-        <span className="flex flex-col items-center">
+      <span className="flex items-center gap-1">
+        <Hint label={label} value={value}>
           <span className="flex items-center gap-1 text-[12px] text-ink">
             <Icon size={11} className="text-faint" />
             {code}
           </span>
-          <span className="max-w-20 truncate text-[10px] text-faint">{detail}</span>
-        </span>
+        </Hint>
+        {codeExtra}
+      </span>
+      <Hint label={label} value={value}>
+        <span className="max-w-20 truncate text-[10px] text-faint">{detail}</span>
       </Hint>
-      {children}
     </div>
   );
 }
@@ -188,7 +192,7 @@ function InlandStop({ point, label }: { point: InlandPoint; label: string }) {
   );
 }
 
-function PortStop({ port, label, children }: { port: PortCall; label: string; children?: React.ReactNode }) {
+function PortStop({ port, label }: { port: PortCall; label: string }) {
   return (
     <StopView
       icon={Anchor}
@@ -196,9 +200,8 @@ function PortStop({ port, label, children }: { port: PortCall; label: string; ch
       detail={port.terminal ?? port.name}
       label={label}
       value={[port.code, port.name, port.terminal].filter(Boolean).join(' · ')}
-    >
-      {children}
-    </StopView>
+      codeExtra={port.freeDays && <FreeDays freeDays={port.freeDays} where={port.code} />}
+    />
   );
 }
 
@@ -292,35 +295,28 @@ function OceanLeg({ ocean }: { ocean: RateRoute['ocean'] }) {
   );
 }
 
-/** Free days at the port of discharge. */
-function FreeDays({ freeDays }: { freeDays: RateRoute['pod']['freeDays'] }) {
+/** Free days at a port — calendar icon next to the port code; hover shows the days. */
+function FreeDays({ freeDays, where }: { freeDays: { demurrage: number; detention: number }; where: string }) {
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild onClick={stop}>
-        <button type="button" className="flex items-center gap-0.5 text-[10px] text-brand hover:underline">
-          Free days <ChevronDown size={10} />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="center" onClick={stop} className="min-w-40">
-        <DropdownMenuLabel>Free days at POD</DropdownMenuLabel>
-        <div className="space-y-1 px-2.5 pb-1.5 text-[12px]">
-          <div className="flex justify-between">
-            <span className="text-muted">Demurrage</span>
-            <span className="text-ink">{freeDays.demurrage} days</span>
-          </div>
-          <div className="flex justify-between">
-            <span className="text-muted">Detention</span>
-            <span className="text-ink">{freeDays.detention} days</span>
-          </div>
-        </div>
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <Hint
+      label={`Free days · ${where}`}
+      value={`Demurrage ${freeDays.demurrage} days · Detention ${freeDays.detention} days`}
+    >
+      <span
+        tabIndex={0}
+        aria-label={`Free days at ${where}: demurrage ${freeDays.demurrage}, detention ${freeDays.detention}`}
+        className="grid size-4 place-items-center rounded-[4px] text-brand outline-none hover:bg-brand/15 focus-visible:bg-brand/15"
+      >
+        <CalendarDays size={11} />
+      </span>
+    </Hint>
   );
 }
 
 export function RouteRow({ route }: { route: RateRoute }) {
   return (
-    <div className="px-3 py-1.5">
+    // Even 12px padding around the schedule.
+    <div className="p-3">
       <div className="flex min-w-0 items-start gap-1">
         {route.origin && (
           <>
@@ -330,9 +326,7 @@ export function RouteRow({ route }: { route: RateRoute }) {
         )}
         <PortStop port={route.pol} label="Port of loading" />
         <OceanLeg ocean={route.ocean} />
-        <PortStop port={route.pod} label="Port of discharge">
-          <FreeDays freeDays={route.pod.freeDays} />
-        </PortStop>
+        <PortStop port={route.pod} label="Port of discharge" />
         {route.destination && (
           <>
             <InlandLegView leg={route.destination.leg} label="On-carriage" />
@@ -364,7 +358,8 @@ function CompactRoute({ route }: { route: RateRoute }) {
   const caption = `${ocean.sailings[0].slice(0, 6)} · ${ocean.via.length ? `${ocean.via.length} T/S` : 'Direct'} · ${ocean.transit.replace(' days', 'd')}`;
 
   return (
-    <div className="px-3 py-1.5">
+    // Even 12px padding around the schedule.
+    <div className="p-3">
       <div className="flex min-w-0 items-start gap-1">
         {origin ? (
           <InlandStop point={origin.point} label="Place of receipt" />
@@ -387,9 +382,7 @@ function CompactRoute({ route }: { route: RateRoute }) {
         {destination ? (
           <InlandStop point={destination.point} label="Place of delivery" />
         ) : (
-          <PortStop port={pod} label="Port of discharge">
-            <FreeDays freeDays={pod.freeDays} />
-          </PortStop>
+          <PortStop port={pod} label="Port of discharge" />
         )}
       </div>
     </div>

@@ -34,6 +34,7 @@ import {
   type CommonExtraction,
 } from '../data/chargeEdits';
 import { useAgent } from '@/lib/agent-context';
+import { useStuck } from '@/lib/use-stuck';
 import { LaneFields, type Leg } from './LocationField';
 import { LoadDetails, type Load } from './LoadDetails';
 import { contacts, type ContactSummary } from '../data/contacts';
@@ -41,7 +42,6 @@ import { ChipCombobox } from '@/components/ui/combobox';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { GroupedMultiSelect, type MultiSelectGroup } from '@/components/ui/multi-select';
 import { doorLocations, portByCode } from '../data/locations';
-import { Chip } from './ui';
 import { Button } from '@/components/ui/button';
 import { Input, Select } from '@/components/ui/input';
 import { Field } from '@/components/ui/field';
@@ -439,6 +439,8 @@ function StepBody({
   /** Step 4 — draft quote: PDF file name + validity dates. */
   quote: { fileName: string; start: string; expiry: string; onStart: (v: string) => void; onExpiry: (v: string) => void };
 }) {
+  // Step 3's sticky header condenses once scrolled (step 2 handles its own in SearchResults).
+  const [sentinelRef, stuck] = useStuck();
 
   // Step 2 — multi-select rate cards.
   if (index === 1) {
@@ -483,9 +485,10 @@ function StepBody({
     }
     return (
       <div className="space-y-4">
-        {/* Pinned search recap + equipment columns, aligned with the cards' prices */}
+        {/* Pinned search recap + equipment columns, aligned with the cards' prices; condenses once scrolled */}
+        <div ref={sentinelRef} aria-hidden className="h-px" />
         <StickyHeader>
-          <RecapRow recap={recap} lines={lines} onViewSearch={onViewSearch} />
+          <RecapRow recap={recap} lines={lines} onViewSearch={onViewSearch} compact={stuck} />
           <div className="px-5 py-1.5">
             <PriceHeader
               currency={recap.currency}
@@ -848,51 +851,60 @@ export function EnquiryTab() {
   const toggleCarrier = (c: string) =>
     setSelectedCarriers((prev) => (prev.includes(c) ? prev.filter((x) => x !== c) : [...prev, c]));
 
-  const step = steps[active];
-  const StepIcon = step.icon;
   // Left pane: email on steps 1, 4 (with Atlas's quote draft) & 5.
   const leftMode: 'email' | null = active === 0 || active === 3 || active === 4 ? 'email' : null;
 
   return (
     <div className="flex h-full flex-col bg-surface">
       {/* Stepper — equal-width bordered steps; connectors sit in the gaps between them. */}
-      <ol className="flex items-center border-b border-line px-5 py-3">
-        {steps.map((m, i) => {
-          const done = m.status === 'done';
-          const on = i === active;
-          const Icon = m.icon;
-          return (
-            <Fragment key={m.label}>
-              <li className="min-w-0 flex-1 basis-0">
-                <button
-                  onClick={() => setActive(i)}
-                  aria-current={on ? 'step' : undefined}
-                  className={cn(
-                    'flex w-full min-w-0 items-center justify-center gap-2 rounded-lg border px-3 py-2 transition-colors',
-                    on ? 'border-line-strong bg-subtle' : 'border-line hover:border-line-strong hover:bg-subtle/60',
-                  )}
-                >
-                  <span
+      {/* Stepper + step actions — the stepper doubles as the step title (no separate heading). Expand lives in the tab bar. */}
+      <div className="flex items-center gap-3 border-b border-line px-5 py-3">
+        <ol className="flex min-w-0 flex-1 items-center">
+          {steps.map((m, i) => {
+            const done = m.status === 'done';
+            const on = i === active;
+            const Icon = m.icon;
+            return (
+              <Fragment key={m.label}>
+                <li className="min-w-0 flex-1 basis-0">
+                  <button
+                    onClick={() => setActive(i)}
+                    aria-current={on ? 'step' : undefined}
                     className={cn(
-                      'grid size-6 shrink-0 place-items-center rounded-full border',
-                      done ? 'border-atlas/50 text-atlas' : on ? 'border-ink text-ink' : 'border-line-strong text-faint',
+                      'flex w-full min-w-0 items-center justify-center gap-2 rounded-lg border px-3 py-2 transition-colors',
+                      on ? 'border-line-strong bg-subtle' : 'border-line hover:border-line-strong hover:bg-subtle/60',
                     )}
                   >
-                    {done ? <Check size={13} strokeWidth={3} /> : <Icon size={13} />}
-                  </span>
-                  <span className={cn('truncate text-[12px] font-semibold', on ? 'text-ink' : 'text-muted')}>
-                    {m.label}
-                  </span>
-                </button>
-              </li>
-              {/* Connector — fills the gap between two step borders, never overlapping them. */}
-              {i < steps.length - 1 && (
-                <li aria-hidden className={cn('mx-1.5 h-px w-6 shrink-0', done ? 'bg-atlas/50' : 'bg-line')} />
-              )}
-            </Fragment>
-          );
-        })}
-      </ol>
+                    <span
+                      className={cn(
+                        'grid size-6 shrink-0 place-items-center rounded-full border',
+                        done ? 'border-atlas/50 text-atlas' : on ? 'border-ink text-ink' : 'border-line-strong text-faint',
+                      )}
+                    >
+                      {done ? <Check size={13} strokeWidth={3} /> : <Icon size={13} />}
+                    </span>
+                    <span className={cn('truncate text-[12px] font-semibold', on ? 'text-ink' : 'text-muted')}>
+                      {m.label}
+                    </span>
+                  </button>
+                </li>
+                {/* Connector — fills the gap between two step borders, never overlapping them. */}
+                {i < steps.length - 1 && (
+                  <li aria-hidden className={cn('mx-1.5 h-px w-6 shrink-0', done ? 'bg-atlas/50' : 'bg-line')} />
+                )}
+              </Fragment>
+            );
+          })}
+        </ol>
+        <div className="flex shrink-0 items-center gap-2">
+          {/* Step 3 — opens the agent panel scoped to every selected rate. */}
+          {active === 2 && (
+            <Button size="sm" onClick={() => askAtlasFor(null)} className="bg-atlas text-canvas hover:bg-atlas/90">
+              <Sparkles size={14} /> Edit with Atlas
+            </Button>
+          )}
+        </div>
+      </div>
 
       {/* Two-pane body */}
       <div className="flex min-h-0 flex-1">
@@ -936,31 +948,9 @@ export function EnquiryTab() {
           ))}
 
         <div className="flex min-h-0 flex-1 flex-col">
-          {/* No top padding on the scroller (it lives on the title) so sticky headers sit flush at the top. */}
+          {/* No top padding on the scroller (a spacer scrolls away instead) so sticky headers sit flush at the top. */}
           <div className="flex-1 overflow-y-auto px-5 pb-5">
-            <div className="mb-3 flex items-center gap-2 pt-5">
-              <StepIcon size={16} className="text-muted" />
-              <h3 className="text-[16px] font-semibold text-ink">
-                Step {active + 1} · {step.label}
-              </h3>
-              {step.status === 'done' && (
-                <Chip tone="success">
-                  <Check size={11} /> Completed
-                </Chip>
-              )}
-              {/* Step 3 — opens the agent panel scoped to every selected rate. */}
-              {active === 2 && (
-                <Button
-                  size="sm"
-                  onClick={() => askAtlasFor(null)}
-                  className="ml-auto bg-atlas text-canvas hover:bg-atlas/90"
-                >
-                  <Sparkles size={14} /> Edit with Atlas
-                </Button>
-              )}
-            </div>
-            {/* Step 3 has no info line — its Atlas button sits in the header above. */}
-            {active !== 2 ? <p className="mb-4 text-[14px] text-muted">{step.detail}</p> : <div className="mb-4" />}
+            <div aria-hidden className="h-4" />
             {active === 0 ? (
               <SearchForm params={params} onChange={setParams} onSearch={() => setActive(1)} />
             ) : (
