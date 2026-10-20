@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { TopBar } from './components/TopBar';
 import { DealInfoPane } from './components/DealInfoPane';
@@ -12,6 +12,7 @@ import { activity, type Activity } from './data/deal';
 import { type DealSummary } from './data/deals';
 import { type ContactSummary } from './data/contacts';
 import { AgentProvider, type AgentScope } from './lib/agent-context';
+import { FocusProvider } from './lib/focus-context';
 
 type View = 'pipeline' | 'deal' | 'contacts' | 'contact';
 
@@ -47,14 +48,46 @@ export default function App() {
     askAtlas: (scope: AgentScope) => {
       setAgentScope(scope);
       setChatOpen(true);
+      setChatInFocus(true);
     },
     clearScope: () => setAgentScope(null),
   };
 
+  // Expand (Enquiry): hide sidebar, record pane and chat. Only while the Enquiry tab is
+  // showing — leaving it collapses, returning restores. Esc turns it off.
+  const [expandWanted, setExpandWanted] = useState(false);
+  const [expandable, setExpandable] = useState(false);
+  const focusOn = expandWanted && expandable && view === 'deal';
+  // While expanded the chat is hidden, unless the user opens it from there.
+  const [chatInFocus, setChatInFocus] = useState(false);
+  const setFocus = (on: boolean) => {
+    setExpandWanted(on);
+    setChatInFocus(false);
+  };
+  useEffect(() => {
+    if (!focusOn) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape' && !(e.target as HTMLElement)?.closest('[role="dialog"],[role="menu"]')) {
+        setExpandWanted(false);
+        setChatInFocus(false);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [focusOn]);
+  const chatVisible = chatOpen && (!focusOn || chatInFocus);
+  const toggleChat = () => {
+    if (focusOn && !chatInFocus) {
+      setChatOpen(true);
+      setChatInFocus(true);
+    } else setChatOpen((v) => !v);
+  };
+
   return (
+    <FocusProvider value={{ focus: focusOn, setFocus, setExpandable }}>
     <AgentProvider value={agent}>
       <div className="flex h-screen bg-canvas text-ink">
-        <Sidebar active={activeNav} onNavigate={navigate} />
+        {!focusOn && <Sidebar active={activeNav} onNavigate={navigate} />}
 
         {view === 'pipeline' && <DealsView onOpenDeal={openDeal} />}
         {view === 'contacts' && <ContactsView onOpenContact={openContact} />}
@@ -66,16 +99,17 @@ export default function App() {
                 section="Pipeline"
                 title={selectedDeal.company}
                 badge={selectedDeal.id}
-                chatOpen={chatOpen}
-                onToggleChat={() => setChatOpen((v) => !v)}
+                chatOpen={chatVisible}
+                onToggleChat={toggleChat}
                 onBack={() => setView('pipeline')}
               />
+              {/* Distinct sibling keys (per deal) — the info pane is removed/re-added by Focus mode. */}
               <div className="flex min-h-0 flex-1">
-                <DealInfoPane key={selectedDeal.id} deal={selectedDeal} />
-                <DealTabs key={selectedDeal.id} deal={selectedDeal} activityLog={log} />
+                {!focusOn && <DealInfoPane key={`info-${selectedDeal.id}`} deal={selectedDeal} />}
+                <DealTabs key={`tabs-${selectedDeal.id}`} deal={selectedDeal} activityLog={log} />
               </div>
             </div>
-            <AgentChat open={chatOpen} onClose={() => setChatOpen(false)} onRecord={recordActivity} />
+            <AgentChat open={chatVisible} onClose={() => setChatOpen(false)} onRecord={recordActivity} />
           </>
         )}
 
@@ -91,8 +125,8 @@ export default function App() {
                 onBack={() => setView('contacts')}
               />
               <div className="flex min-h-0 flex-1">
-                <ContactInfoPane key={selectedContact.id} contact={selectedContact} />
-                <ContactTabs key={selectedContact.id} contact={selectedContact} onOpenDeal={openDeal} />
+                <ContactInfoPane key={`info-${selectedContact.id}`} contact={selectedContact} />
+                <ContactTabs key={`tabs-${selectedContact.id}`} contact={selectedContact} onOpenDeal={openDeal} />
               </div>
             </div>
             <AgentChat open={chatOpen} onClose={() => setChatOpen(false)} onRecord={recordActivity} />
@@ -100,5 +134,6 @@ export default function App() {
         )}
       </div>
     </AgentProvider>
+    </FocusProvider>
   );
 }
