@@ -32,6 +32,12 @@ export const servedLanes = new Set([
   'Vietnam → Germany',
   'Germany → India',
   'United States → India',
+  'India → UAE',
+  'Japan → Netherlands',
+  'Sweden → United States',
+  'Finland → United States',
+  'Norway → South Korea',
+  'Vietnam → Australia',
 ]);
 
 export interface ShareRow {
@@ -89,6 +95,11 @@ export interface LeadSummary {
   aiSummary: string;
   aiSummaryAt: string;
 
+  /** TradeMo provider company id (dedupe key for the company on convert). */
+  tradeMoId?: string;
+  /** Set once converted — the deal / contact / company it produced. */
+  convertedTo?: { dealId: string; contactId: string; organizationId: string };
+
   // Match details (SDR search)
   sdrSearchId: string;
   searchRole: 'Buyer' | 'Supplier';
@@ -137,6 +148,7 @@ export const MONTHS = ['Oct', 'Nov', 'Dec', 'Jan', 'Feb', 'Mar', 'Apr', 'May', '
 export const leads: LeadSummary[] = [
   {
     id: 'AT-LEAD-0211',
+    tradeMoId: 'TM-61830',
     company: 'Sundaram Auto Components',
     contactName: 'Arjun Mehta',
     contactRole: 'Head of Logistics',
@@ -219,6 +231,7 @@ export const leads: LeadSummary[] = [
   },
   {
     id: 'AT-LEAD-0207',
+    tradeMoId: 'TM-72215',
     company: 'Mekong Fresh Exports',
     contactName: 'Linh Tran',
     contactRole: 'Export Manager',
@@ -294,6 +307,7 @@ export const leads: LeadSummary[] = [
   },
   {
     id: 'AT-LEAD-0198',
+    tradeMoId: 'TM-58004',
     company: 'Gujarat Chem Industries',
     contactName: 'Neha Shah',
     contactRole: 'Supply Chain Manager',
@@ -367,6 +381,7 @@ export const leads: LeadSummary[] = [
   },
   {
     id: 'AT-LEAD-0186',
+    tradeMoId: 'TM-90442',
     company: 'Hanseatic Machinery GmbH',
     contactName: 'Jonas Becker',
     contactRole: 'Procurement Director',
@@ -493,6 +508,7 @@ export const leads: LeadSummary[] = [
   },
   {
     id: 'AT-LEAD-0179',
+    tradeMoId: 'TM-33019',
     company: 'Andean Copper Traders',
     contactName: 'Camila Rojas',
     contactRole: 'Logistics Coordinator',

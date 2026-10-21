@@ -16,7 +16,7 @@ import {
   SlidersHorizontal,
   ChevronDown,
 } from 'lucide-react';
-import { deals as seedDeals, stages, stageColor, type DealSummary, type Stage } from '../data/deals';
+import { stages, stageColor, type DealSummary, type Stage } from '../data/deals';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card } from '@/components/ui/card';
@@ -234,9 +234,17 @@ function List({ rows, onOpen }: { rows: DealSummary[]; onOpen: (d: DealSummary) 
 
 /* ── View ──────────────────────────────────────────────────────────────────── */
 
-export function DealsView({ onOpenDeal }: { onOpenDeal: (d: DealSummary) => void }) {
+export function DealsView({
+  items,
+  setItems,
+  onOpenDeal,
+}: {
+  /** Deals live in App so lead conversion can add to them. */
+  items: DealSummary[];
+  setItems: React.Dispatch<React.SetStateAction<DealSummary[]>>;
+  onOpenDeal: (d: DealSummary) => void;
+}) {
   const [mode, setMode] = useState<ViewMode>('kanban');
-  const [items, setItems] = useState<DealSummary[]>(seedDeals);
 
   const [query, setQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortKey>('updated');
