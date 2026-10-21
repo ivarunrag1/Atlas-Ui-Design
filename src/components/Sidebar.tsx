@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { LayoutDashboard, Bot, Users, BarChart3, Settings, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { LayoutDashboard, Target, Bot, Users, BarChart3, Settings, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Hint } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
 
 const nav = [
   { icon: LayoutDashboard, label: 'Pipeline' },
+  { icon: Target, label: 'Leads' },
   { icon: Bot, label: 'Agents' },
   { icon: Users, label: 'Contacts' },
   { icon: BarChart3, label: 'Reports' },

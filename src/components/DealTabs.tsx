@@ -12,6 +12,7 @@ import {
 } from 'lucide-react';
 import { messages, documents, comments, type Activity } from '../data/deal';
 import { type DealSummary } from '../data/deals';
+import type { DealFieldValues } from '../data/dealFields';
 import { Tabs, TabsList, TabsContent, TabTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Hint } from '@/components/ui/tooltip';
@@ -25,7 +26,18 @@ import { CommentsTab } from './CommentsTab';
 
 type TabKey = 'overview' | 'attributes' | 'enquiry' | 'emails' | 'documents' | 'comments';
 
-export function DealTabs({ deal, activityLog }: { deal: DealSummary; activityLog: Activity[] }) {
+export function DealTabs({
+  deal,
+  activityLog,
+  fieldValues,
+  onFieldChange,
+}: {
+  deal: DealSummary;
+  activityLog: Activity[];
+  /** Atlas deal field values (shared with the left pane). */
+  fieldValues: DealFieldValues;
+  onFieldChange: (key: string, value: string) => void;
+}) {
   const tabs: { key: TabKey; label: string; icon: LucideIcon; count?: number }[] = [
     { key: 'overview', label: 'Overview', icon: LayoutDashboard },
     { key: 'attributes', label: 'Attributes', icon: Tag },
@@ -37,7 +49,7 @@ export function DealTabs({ deal, activityLog }: { deal: DealSummary; activityLog
 
   const [tab, setTab] = useState<TabKey>('overview');
   const { focus, setFocus, setExpandable } = useFocusMode();
-  // Expand applies to every tab while the deal tabs are showing — it stays on until collapsed.
+  // Focus applies to every tab while the deal tabs are showing — it stays on until exited.
   useEffect(() => {
     setExpandable(true);
     return () => setExpandable(false);
@@ -45,7 +57,7 @@ export function DealTabs({ deal, activityLog }: { deal: DealSummary; activityLog
 
   return (
     <Tabs value={tab} onValueChange={(v) => setTab(v as TabKey)} className="flex-1 overflow-hidden bg-surface">
-      {/* Tab bar — Expand (common to all tabs) sits at its right end */}
+      {/* Tab bar — Focus (common to all tabs) sits at its right end */}
       <div className="flex shrink-0 items-center gap-2 border-b border-line pr-3">
         <TabsList className="min-w-0 flex-1 border-b-0">
           {tabs.map(({ key, label, icon, count }) => (
@@ -53,11 +65,11 @@ export function DealTabs({ deal, activityLog }: { deal: DealSummary; activityLog
           ))}
         </TabsList>
         <Hint
-          label={focus ? 'Collapse' : 'Expand'}
+          label={focus ? 'Exit focus' : 'Focus'}
           value={
             focus
               ? 'Show the sidebar, deal pane and chat again (Esc)'
-              : 'Hide the sidebar, deal pane and chat for more room — stays on across tabs until you collapse'
+              : 'Hide the sidebar, deal pane and chat for more room — stays on across tabs until you exit'
           }
         >
           <Button
@@ -68,7 +80,7 @@ export function DealTabs({ deal, activityLog }: { deal: DealSummary; activityLog
             className={focus ? 'border-atlas/50 text-atlas' : 'text-muted'}
           >
             {focus ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
-            {focus ? 'Collapse' : 'Expand'}
+            {focus ? 'Exit focus' : 'Focus'}
           </Button>
         </Hint>
       </div>
@@ -77,7 +89,7 @@ export function DealTabs({ deal, activityLog }: { deal: DealSummary; activityLog
         <OverviewTab deal={deal} log={activityLog} />
       </TabsContent>
       <TabsContent value="attributes">
-        <AttributesTab deal={deal} />
+        <AttributesTab deal={deal} values={fieldValues} onChange={onFieldChange} />
       </TabsContent>
       <TabsContent value="enquiry">
         <EnquiryTab />

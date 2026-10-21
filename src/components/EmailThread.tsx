@@ -10,13 +10,14 @@ import {
   ChevronDown,
   ArrowDownLeft,
   ArrowUpRight,
+  Reply,
+  X,
 } from 'lucide-react';
 import { messages, deal, type Message } from '../data/deal';
 import { Avatar, Chip } from './ui';
 import { Button } from '@/components/ui/button';
 import { Card, CardIcon } from '@/components/ui/card';
 import { Input, inputVariants } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
 import { RecipientInput } from '@/components/ui/recipient-input';
 import { RichTextEditor, textToHtml } from '@/components/ui/rich-text-editor';
 import { cn } from '@/lib/utils';
@@ -81,63 +82,18 @@ function MessageRow({ message, defaultOpen = false }: { message: Message; defaul
   );
 }
 
-/** The agent's staged follow-up — always fully open. */
-function DraftRow({ message }: { message: Message }) {
-  const [editing, setEditing] = useState(false);
-  const [text, setText] = useState(message.body.join('\n\n'));
+/* ── Email composer (shared: follow-up draft, quote draft, reply) ─────────────── */
 
-  return (
-    <article className="border-l-2 border-l-atlas/50 bg-atlas-bg/15 px-5 py-4">
-      <div className="mb-2 flex items-center gap-2">
-        <Sparkles size={15} className="text-atlas" />
-        <span className="text-[14px] font-semibold text-atlas">Atlas drafted a follow-up</span>
-        <Chip tone="atlas">Draft · sends in 2h</Chip>
-        <span className="ml-auto text-[12px] text-faint">Auto mode</span>
-      </div>
-
-      <div className="flex items-start gap-3">
-        <Avatar initials={message.from.initials} actor="atlas" />
-        <div className="min-w-0 flex-1">
-          <div className="flex items-center gap-2 text-[12px] text-faint">
-            To <span className="font-medium text-ink">{message.to}</span>
-          </div>
-          {editing ? (
-            <Textarea value={text} onChange={(e) => setText(e.target.value)} rows={4} className="mt-2 p-3" />
-          ) : (
-            <p className="mt-2 whitespace-pre-line rounded-lg bg-subtle p-3 text-[14px] italic leading-relaxed text-ink/90">
-              {text}
-            </p>
-          )}
-
-          <div className="mt-3 flex items-center gap-2">
-            <Button variant="secondary" onClick={() => setEditing((v) => !v)}>
-              <Pencil size={14} />
-              {editing ? 'Done editing' : 'Preview & edit'}
-            </Button>
-            <Button>
-              <Send size={14} />
-              Send now
-            </Button>
-            <Button variant="ghost">
-              <Pause size={14} />
-              Pause
-            </Button>
-          </div>
-        </div>
-      </div>
-    </article>
-  );
-}
-
-/** A quote email drafted by Atlas (step 4) — ready to send, with the quote PDF attached. */
-export interface QuoteDraft {
+/** A composed email — recipients, subject and a rich-text (HTML) body. */
+export interface EmailDraft {
   to: string[];
-  cc?: string[];
+  cc: string[];
   subject: string;
-  /** Plain text, paragraphs separated by blank lines (shown as rich text). */
-  body: string;
-  attachment: { label: string; meta: string };
+  html: string;
 }
+
+const emailBodyCls =
+  'text-[14px] leading-relaxed text-ink/90 [&_a]:text-brand [&_a]:underline [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_ul]:list-disc [&_ul]:pl-5';
 
 /** One "Label  value" line of the email header (read mode). */
 function HeaderLine({ label, children }: { label: string; children: React.ReactNode }) {
@@ -149,7 +105,7 @@ function HeaderLine({ label, children }: { label: string; children: React.ReactN
   );
 }
 
-/** Label column for the composer rows (edit mode). */
+/** Label column for the composer rows. */
 function ComposerRow({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label className="flex items-start gap-2">
@@ -159,31 +115,138 @@ function ComposerRow({ label, children }: { label: string; children: React.React
   );
 }
 
-function QuoteDraftRow({ draft, onSend }: { draft: QuoteDraft; onSend?: () => void }) {
-  const [editing, setEditing] = useState(false);
-  // Until edited, follow the latest draft (e.g. new validity dates); then keep the user's copy.
-  const [to, setTo] = useState<string[] | null>(null);
-  const [cc, setCc] = useState<string[] | null>(null);
-  const [subject, setSubject] = useState<string | null>(null);
-  const [html, setHtml] = useState<string | null>(null);
-  const cur = {
-    to: to ?? draft.to,
-    cc: cc ?? draft.cc ?? [],
-    subject: subject ?? draft.subject,
-    html: html ?? textToHtml(draft.body),
-  };
-
-  const attachment = (
+function AttachmentChip({ attachment }: { attachment: { label: string; meta: string } }) {
+  return (
     <Card className="flex w-fit items-center gap-3 px-3 py-1.5">
       <CardIcon className="size-7">
         <FileText size={14} />
       </CardIcon>
       <div className="leading-tight">
-        <div className="text-[12px] font-semibold text-ink">{draft.attachment.label}</div>
-        <div className="text-[10px] text-faint">{draft.attachment.meta}</div>
+        <div className="text-[12px] font-semibold text-ink">{attachment.label}</div>
+        <div className="text-[10px] text-faint">{attachment.meta}</div>
       </div>
     </Card>
   );
+}
+
+/** Traditional email composer: To · Cc · Subject · rich-text body (+ attachment). */
+function EmailComposer({
+  value,
+  onChange,
+  attachment,
+  autoFocus,
+}: {
+  value: EmailDraft;
+  onChange: (next: EmailDraft) => void;
+  attachment?: { label: string; meta: string };
+  autoFocus?: boolean;
+}) {
+  return (
+    <div className="space-y-2">
+      <ComposerRow label="To">
+        <RecipientInput aria-label="To" value={value.to} onChange={(to) => onChange({ ...value, to })} placeholder="Add recipients…" />
+      </ComposerRow>
+      <ComposerRow label="Cc">
+        <RecipientInput aria-label="Cc" value={value.cc} onChange={(cc) => onChange({ ...value, cc })} placeholder="Add Cc…" />
+      </ComposerRow>
+      <ComposerRow label="Subject">
+        <Input size="sm" autoFocus={autoFocus} value={value.subject} onChange={(e) => onChange({ ...value, subject: e.target.value })} />
+      </ComposerRow>
+      <RichTextEditor aria-label="Email body" value={value.html} onChange={(html) => onChange({ ...value, html })} placeholder="Write your email…" />
+      {attachment && <AttachmentChip attachment={attachment} />}
+    </div>
+  );
+}
+
+/** Read mode of a composed email: header lines + formatted body (+ attachment). */
+function EmailReadView({ value, attachment }: { value: EmailDraft; attachment?: { label: string; meta: string } }) {
+  return (
+    <div className="space-y-2">
+      <div className="space-y-0.5">
+        <HeaderLine label="To">{value.to.join(', ') || '—'}</HeaderLine>
+        {value.cc.length > 0 && <HeaderLine label="Cc">{value.cc.join(', ')}</HeaderLine>}
+        <HeaderLine label="Subject">{value.subject}</HeaderLine>
+      </div>
+      {/* Our own draft / editor HTML. */}
+      <div className={cn('rounded-lg bg-subtle p-3', emailBodyCls)} dangerouslySetInnerHTML={{ __html: value.html }} />
+      {attachment && <AttachmentChip attachment={attachment} />}
+    </div>
+  );
+}
+
+/** "Name <email>" / "email" → email. */
+const emailOf = (s: string) => s.match(/<([^>]+)>/)?.[1] ?? s.trim();
+/** Rich-text HTML → plain paragraphs (for a sent message's body). */
+const htmlToParagraphs = (html: string) => {
+  const div = document.createElement('div');
+  div.innerHTML = html.replace(/<\/(p|li|div)>/gi, '\n\n').replace(/<br\s*\/?>/gi, '\n');
+  return (div.textContent ?? '').split(/\n{2,}/).map((p) => p.trim()).filter(Boolean);
+};
+const replySubject = (s: string) => (/^re:/i.test(s) ? s : `Re: ${s}`);
+
+/* ── Atlas's staged follow-up ──────────────────────────────────────────────── */
+
+/** The agent's staged follow-up — always open; "Preview & edit" opens the full composer. */
+function DraftRow({ message }: { message: Message }) {
+  const [editing, setEditing] = useState(false);
+  const [email, setEmail] = useState<EmailDraft>(() => ({
+    to: [emailOf(message.to)],
+    cc: [],
+    subject: replySubject(deal.linked.thread.subject),
+    html: textToHtml(message.body.join('\n\n')),
+  }));
+
+  return (
+    <article className="border-l-2 border-l-atlas/50 bg-atlas-bg/15 px-4 py-3">
+      <div className="mb-2 flex items-center gap-2">
+        <Sparkles size={14} className="text-atlas" />
+        <span className="text-[12px] font-semibold text-atlas">Atlas drafted a follow-up</span>
+        <Chip tone="atlas">Draft · sends in 2h</Chip>
+        <span className="ml-auto text-[10px] text-faint">Auto mode</span>
+      </div>
+
+      {editing ? <EmailComposer value={email} onChange={setEmail} /> : <EmailReadView value={email} />}
+
+      <div className="mt-3 flex items-center gap-2">
+        <Button variant="secondary" size="sm" onClick={() => setEditing((v) => !v)}>
+          {editing ? <Check size={14} /> : <Pencil size={14} />}
+          {editing ? 'Done editing' : 'Preview & edit'}
+        </Button>
+        <Button size="sm" disabled={email.to.length === 0}>
+          <Send size={14} />
+          Send now
+        </Button>
+        <Button variant="ghost" size="sm">
+          <Pause size={14} />
+          Pause
+        </Button>
+      </div>
+    </article>
+  );
+}
+
+/* ── Quote email drafted by Atlas (step 4) ─────────────────────────────────── */
+
+/** A quote email drafted by Atlas (step 4) — ready to send, with the quote PDF attached. */
+export interface QuoteDraft {
+  to: string[];
+  cc?: string[];
+  subject: string;
+  /** Plain text, paragraphs separated by blank lines (shown as rich text). */
+  body: string;
+  attachment: { label: string; meta: string };
+}
+
+function QuoteDraftRow({ draft, onSend }: { draft: QuoteDraft; onSend?: () => void }) {
+  const [editing, setEditing] = useState(false);
+  // Until edited, follow the latest draft (e.g. new validity dates); then keep the user's copy.
+  const [edited, setEdited] = useState<EmailDraft | null>(null);
+  const email: EmailDraft = edited ?? {
+    to: draft.to,
+    cc: draft.cc ?? [],
+    subject: draft.subject,
+    html: textToHtml(draft.body),
+  };
 
   return (
     <article className="border-l-2 border-l-atlas/50 bg-atlas-bg/15 px-4 py-3">
@@ -194,34 +257,9 @@ function QuoteDraftRow({ draft, onSend }: { draft: QuoteDraft; onSend?: () => vo
       </div>
 
       {editing ? (
-        // Composer — To / Cc / Subject + rich text body
-        <div className="space-y-2">
-          <ComposerRow label="To">
-            <RecipientInput aria-label="To" value={cur.to} onChange={setTo} placeholder="Add recipients…" />
-          </ComposerRow>
-          <ComposerRow label="Cc">
-            <RecipientInput aria-label="Cc" value={cur.cc} onChange={setCc} placeholder="Add Cc…" />
-          </ComposerRow>
-          <ComposerRow label="Subject">
-            <Input size="sm" value={cur.subject} onChange={(e) => setSubject(e.target.value)} />
-          </ComposerRow>
-          <RichTextEditor aria-label="Email body" value={cur.html} onChange={setHtml} placeholder="Write the email…" />
-          {attachment}
-        </div>
+        <EmailComposer value={email} onChange={setEdited} attachment={draft.attachment} />
       ) : (
-        <div className="space-y-2">
-          <div className="space-y-0.5">
-            <HeaderLine label="To">{cur.to.join(', ')}</HeaderLine>
-            {cur.cc.length > 0 && <HeaderLine label="Cc">{cur.cc.join(', ')}</HeaderLine>}
-            <HeaderLine label="Subject">{cur.subject}</HeaderLine>
-          </div>
-          <div
-            className="rounded-lg bg-subtle p-3 text-[14px] leading-relaxed text-ink/90 [&_a]:text-brand [&_a]:underline [&_ol]:list-decimal [&_ol]:pl-5 [&_p]:mb-2 [&_p:last-child]:mb-0 [&_ul]:list-disc [&_ul]:pl-5"
-            // Our own draft / editor HTML.
-            dangerouslySetInnerHTML={{ __html: cur.html }}
-          />
-          {attachment}
-        </div>
+        <EmailReadView value={email} attachment={draft.attachment} />
       )}
 
       <div className="mt-3 flex items-center gap-2">
@@ -229,7 +267,7 @@ function QuoteDraftRow({ draft, onSend }: { draft: QuoteDraft; onSend?: () => vo
           {editing ? <Check size={14} /> : <Pencil size={14} />}
           {editing ? 'Done editing' : 'Edit email'}
         </Button>
-        <Button size="sm" onClick={onSend} disabled={cur.to.length === 0}>
+        <Button size="sm" onClick={onSend} disabled={email.to.length === 0}>
           <Send size={14} />
           Send quote
         </Button>
@@ -238,13 +276,86 @@ function QuoteDraftRow({ draft, onSend }: { draft: QuoteDraft; onSend?: () => vo
   );
 }
 
+/* ── Reply ─────────────────────────────────────────────────────────────────── */
+
+/** Bottom of the thread: a reply prompt that opens the full composer; Send appends to the thread. */
+function ReplyBox({ onSend }: { onSend: (email: EmailDraft) => void }) {
+  const blank = (): EmailDraft => ({
+    to: [deal.contact.email],
+    cc: [],
+    subject: replySubject(deal.linked.thread.subject),
+    html: '',
+  });
+  const [email, setEmail] = useState<EmailDraft | null>(null);
+  const firstName = deal.contact.name.split(' ')[0];
+
+  if (!email) {
+    return (
+      <div className="border-t border-line px-4 py-3">
+        {/* Looks like an input; opens the reply composer. */}
+        <button
+          type="button"
+          onClick={() => setEmail(blank())}
+          className={cn(inputVariants(), 'flex h-10 cursor-text items-center gap-2 text-left text-faint hover:border-line-strong')}
+        >
+          <Reply size={14} className="shrink-0" />
+          Write a reply to {firstName}…
+        </button>
+      </div>
+    );
+  }
+
+  const hasBody = htmlToParagraphs(email.html).length > 0;
+  return (
+    <div className="max-h-[70%] overflow-y-auto border-t border-line bg-subtle/30 px-4 py-3">
+      <div className="mb-2 flex items-center gap-1.5 text-[12px] font-semibold text-ink">
+        <Reply size={14} className="text-muted" /> Reply
+      </div>
+      <EmailComposer value={email} onChange={setEmail} />
+      <div className="mt-3 flex items-center gap-2">
+        <Button
+          size="sm"
+          disabled={email.to.length === 0 || !hasBody}
+          onClick={() => {
+            onSend(email);
+            setEmail(null);
+          }}
+        >
+          <Send size={14} /> Send
+        </Button>
+        <Button variant="ghost" size="sm" onClick={() => setEmail(null)} className="text-muted">
+          <X size={14} /> Discard
+        </Button>
+      </div>
+    </div>
+  );
+}
+
+/* ── Thread ────────────────────────────────────────────────────────────────── */
+
 /**
  * The deal's email thread. With `quoteDraft` (step 4) the pending follow-up is replaced
- * by Atlas's ready-to-send quote email; `onSendQuote` wires its Send button.
+ * by Atlas's ready-to-send quote email; `onSendQuote` wires its Send button. Replies are
+ * composed in the traditional layout and appended to the thread when sent.
  */
 export function EmailThread({ quoteDraft, onSendQuote }: { quoteDraft?: QuoteDraft; onSendQuote?: () => void } = {}) {
-  const nonDraft = messages.filter((m) => m.status !== 'draft-pending');
-  const lastOpenId = nonDraft[nonDraft.length - 1]?.id;
+  const [sent, setSent] = useState<Message[]>([]);
+  const thread = [...messages.filter((m) => m.status !== 'draft-pending'), ...sent];
+  const lastOpenId = thread[thread.length - 1]?.id;
+  const pendingDraft = messages.find((m) => m.status === 'draft-pending');
+
+  const sendReply = (email: EmailDraft) =>
+    setSent((prev) => [
+      ...prev,
+      {
+        id: `reply-${prev.length + 1}`,
+        from: { name: 'Varun Reddy', initials: 'V', actor: 'you' },
+        to: [...email.to, ...email.cc].join(', '),
+        timestamp: 'Just now',
+        body: htmlToParagraphs(email.html),
+        status: 'sent',
+      },
+    ]);
 
   return (
     <div className="flex h-full min-w-0 flex-col bg-surface">
@@ -253,7 +364,7 @@ export function EmailThread({ quoteDraft, onSendQuote }: { quoteDraft?: QuoteDra
         <div>
           <h2 className="text-[16px] font-semibold text-ink">{deal.linked.thread.subject}</h2>
           <p className="text-[12px] text-faint">
-            {deal.linked.thread.meta} · {deal.contact.email}
+            {thread.length} messages · {deal.contact.email}
           </p>
         </div>
         <Button variant="secondary" size="sm" className="gap-1 text-[12px] text-muted">
@@ -262,26 +373,19 @@ export function EmailThread({ quoteDraft, onSendQuote }: { quoteDraft?: QuoteDra
         </Button>
       </div>
 
-      {/* Conversation — collapsible rows, draft always open */}
-      <div className="flex flex-1 flex-col divide-y divide-line overflow-y-auto">
-        {messages.map((m) =>
-          m.status === 'draft-pending' ? (
-            quoteDraft ? null : <DraftRow key={m.id} message={m} />
-          ) : (
-            <MessageRow key={m.id} message={m} defaultOpen={m.id === lastOpenId} />
-          ),
+      {/* Conversation — collapsible rows; drafts always open */}
+      <div className="flex min-h-0 flex-1 flex-col divide-y divide-line overflow-y-auto">
+        {thread.map((m) => (
+          <MessageRow key={m.id} message={m} defaultOpen={m.id === lastOpenId} />
+        ))}
+        {quoteDraft ? (
+          <QuoteDraftRow draft={quoteDraft} onSend={onSendQuote} />
+        ) : (
+          pendingDraft && <DraftRow message={pendingDraft} />
         )}
-        {quoteDraft && <QuoteDraftRow draft={quoteDraft} onSend={onSendQuote} />}
       </div>
 
-      {/* Reply affordance */}
-      <div className="border-t border-line px-5 py-3">
-        {/* Looks like an input; opens the reply composer. */}
-        <button className={cn(inputVariants(), 'flex h-10 cursor-text items-center gap-2 text-left text-faint hover:border-line-strong')}>
-          <span className="size-6 rounded-full border border-line-strong" />
-          Write a reply to Marcus…
-        </button>
-      </div>
+      <ReplyBox onSend={sendReply} />
     </div>
   );
 }

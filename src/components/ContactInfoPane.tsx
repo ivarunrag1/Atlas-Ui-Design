@@ -1,9 +1,9 @@
 import { useState } from 'react';
-import { Building2, Mail, Phone, MapPin } from 'lucide-react';
+import { Building2, Mail, Phone, MapPin, User, Briefcase, Calendar, CalendarPlus, Hash, Tag } from 'lucide-react';
 import type { ContactSummary } from '../data/contacts';
 import { Input } from '@/components/ui/input';
 import { Field } from '@/components/ui/field';
-import { InfoPane, InfoHeader, InfoSection, EditActions, FactGrid, Fact } from '@/components/ui/info-pane';
+import { InfoPane, InfoHeader, InfoSection, EditActions, FactList, FactRow } from '@/components/ui/info-pane';
 
 export function ContactInfoPane({ contact }: { contact: ContactSummary }) {
   const base = { role: contact.role, email: contact.email, phone: contact.phone };
@@ -64,24 +64,31 @@ export function ContactInfoPane({ contact }: { contact: ContactSummary }) {
 
       {/* Meta */}
       <InfoSection>
-        <FactGrid>
-          <Fact label="Owner">{contact.owner}</Fact>
-          <Fact label="Deals">{contact.dealsCount}</Fact>
-          <Fact label="Last deal">{contact.lastDealDate}</Fact>
-          <Fact label="Created">{contact.created}</Fact>
-          <Fact label="Contact ID">
+        {/* One line per fact: icon + label left, value right */}
+        <FactList>
+          <FactRow icon={User} label="Owner">
+            {contact.owner}
+          </FactRow>
+          <FactRow icon={Briefcase} label="Deals">
+            {contact.dealsCount}
+          </FactRow>
+          <FactRow icon={Calendar} label="Last deal">
+            {contact.lastDealDate}
+          </FactRow>
+          <FactRow icon={CalendarPlus} label="Created">
+            {contact.created}
+          </FactRow>
+          <FactRow icon={Hash} label="Contact ID">
             <span className="text-muted">{contact.id}</span>
-          </Fact>
-          <Fact label="Tags" wide>
-            <div className="mt-1 flex flex-wrap gap-1.5">
-              {contact.tags.map((t) => (
-                <span key={t} className="rounded-full border border-line px-2 py-0.5 text-[12px] font-medium text-muted">
-                  {t}
-                </span>
-              ))}
-            </div>
-          </Fact>
-        </FactGrid>
+          </FactRow>
+          <FactRow icon={Tag} label="Tags" wrap>
+            {contact.tags.map((t) => (
+              <span key={t} className="rounded-full border border-line px-2 py-0.5 text-[10px] font-medium text-muted">
+                {t}
+              </span>
+            ))}
+          </FactRow>
+        </FactList>
       </InfoSection>
     </InfoPane>
   );

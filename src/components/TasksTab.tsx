@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Check, AlertTriangle, Calendar, Plus } from 'lucide-react';
-import type { ContactSummary } from '../data/contacts';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -19,7 +18,8 @@ const seed: Task[] = [
   { id: 't4', title: 'Share company profile deck', due: 'Done', done: true },
 ];
 
-export function TasksTab({ contact }: { contact: ContactSummary }) {
+/** Tasks for a record (contact, lead, …) — `forName` is shown in the header. */
+export function TasksTab({ forName }: { forName: string }) {
   const [tasks, setTasks] = useState<Task[]>(seed);
   const toggle = (id: string) => setTasks((ts) => ts.map((t) => (t.id === id ? { ...t, done: !t.done } : t)));
   const open = tasks.filter((t) => !t.done).length;
@@ -30,7 +30,7 @@ export function TasksTab({ contact }: { contact: ContactSummary }) {
         <div>
           <h2 className="text-[16px] font-semibold text-ink">Tasks</h2>
           <p className="text-[12px] text-faint">
-            {open} open · for {contact.name}
+            {open} open · for {forName}
           </p>
         </div>
         <Button variant="secondary">
