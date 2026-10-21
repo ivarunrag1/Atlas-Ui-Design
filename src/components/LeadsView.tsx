@@ -1,6 +1,5 @@
-import { useState } from 'react';
 import { ArrowLeftRight, Mail, Ship, Trash2, User, UserPlus } from 'lucide-react';
-import { laneCoverage, leadStatusColor, leadStatuses, leads, type LeadStatus, type LeadSummary } from '../data/leads';
+import { laneCoverage, leadStatusColor, leadStatuses, type LeadStatus, type LeadSummary } from '../data/leads';
 import { Button } from '@/components/ui/button';
 import { RecordListView, type RecordColumn } from './record/RecordListView';
 import { KanbanBoard, KanbanCard } from './record/KanbanBoard';
@@ -72,9 +71,16 @@ function LeadKanbanCard({ lead, color, dragging, onOpen }: { lead: LeadSummary; 
 }
 
 /** Leads list — a configuration of the shared RecordListView (List | Kanban) with freight-specific columns. */
-export function LeadsView({ onOpenLead }: { onOpenLead: (l: LeadSummary) => void }) {
-  // Local copy so the board can move leads between statuses.
-  const [items, setItems] = useState<LeadSummary[]>(leads);
+export function LeadsView({
+  items,
+  setItems,
+  onOpenLead,
+}: {
+  /** Leads live in App so conversion can mark them Qualified. */
+  items: LeadSummary[];
+  setItems: React.Dispatch<React.SetStateAction<LeadSummary[]>>;
+  onOpenLead: (l: LeadSummary) => void;
+}) {
   const moveLead = (id: string, status: LeadStatus) => setItems((xs) => xs.map((l) => (l.id === id ? { ...l, status } : l)));
 
   return (

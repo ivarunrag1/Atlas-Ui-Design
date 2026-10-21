@@ -1,5 +1,6 @@
 import {
   ArrowLeftRight,
+  ArrowRight,
   ArrowRightLeft,
   Briefcase,
   CalendarPlus,
@@ -28,8 +29,17 @@ import { cn } from '@/lib/utils';
  * Lead left pane — a variant of the record pane (same InfoPane parts as Contacts):
  * the 10-second verdict (fit, lanes, volume), contact, qualification and record.
  */
-export function LeadInfoPane({ lead }: { lead: LeadSummary }) {
+export function LeadInfoPane({
+  lead,
+  onConvert,
+  onOpenDeal,
+}: {
+  lead: LeadSummary;
+  onConvert: () => void;
+  onOpenDeal: (dealId: string) => void;
+}) {
   const coverage = laneCoverage(lead);
+  const converted = lead.convertedTo;
 
   return (
     <InfoPane storageKey="atlas.leadInfoPane">
@@ -43,9 +53,20 @@ export function LeadInfoPane({ lead }: { lead: LeadSummary }) {
           </Hint>
         </div>
         <p className="mt-2 text-[12px] leading-snug text-muted">{lead.matchReason}</p>
-        <Button size="sm" className="mt-3 w-full" disabled={lead.status === 'Unqualified'}>
-          <ArrowRightLeft size={14} /> Convert to deal
-        </Button>
+        {converted ? (
+          <>
+            <Button variant="secondary" size="sm" className="mt-3 w-full" onClick={() => onOpenDeal(converted.dealId)}>
+              Open deal {converted.dealId} <ArrowRight size={14} />
+            </Button>
+            <p className="mt-1.5 text-center text-[10px] text-faint">
+              Converted · contact {converted.contactId} · company {converted.organizationId}
+            </p>
+          </>
+        ) : (
+          <Button size="sm" className="mt-3 w-full" disabled={lead.status === 'Unqualified'} onClick={onConvert}>
+            <ArrowRightLeft size={14} /> Convert to deal
+          </Button>
+        )}
       </InfoHeader>
 
       {/* Lead fit — freight facts that decide whether it's worth chasing */}

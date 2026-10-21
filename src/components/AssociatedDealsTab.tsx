@@ -1,23 +1,43 @@
 import { Ship } from 'lucide-react';
-import { deals, stageColor, type DealSummary } from '../data/deals';
-import type { ContactSummary } from '../data/contacts';
+import { stageColor, stages, type DealSummary } from '../data/deals';
 import { Card } from '@/components/ui/card';
 
+/** Deals linked to a record (contact or company), with a stage strip on top. */
 export function AssociatedDealsTab({
-  contact,
+  deals: list,
+  title = 'Associated deals',
+  forName,
   onOpenDeal,
 }: {
-  contact: ContactSummary;
+  deals: DealSummary[];
+  title?: string;
+  forName: string;
   onOpenDeal: (d: DealSummary) => void;
 }) {
-  const list = deals.filter((d) => d.contactEmail === contact.email);
 
   return (
     <div className="flex h-full flex-col bg-surface">
       <div className="border-b border-line px-5 py-3">
-        <h2 className="text-[16px] font-semibold text-ink">Associated deals</h2>
-        <p className="text-[12px] text-faint">{list.length} deals linked to {contact.name}</p>
+        <h2 className="text-[16px] font-semibold text-ink">{title}</h2>
+        <p className="text-[12px] text-faint">
+          {list.length} deal{list.length === 1 ? '' : 's'} linked to {forName}
+        </p>
       </div>
+
+      {/* Stage strip — where this record's deals sit in the pipeline */}
+      {list.length > 0 && (
+        <div className="flex flex-wrap gap-x-4 gap-y-1 border-b border-line px-5 py-2.5 text-[12px] text-muted">
+          {stages.map((st) => {
+            const n = list.filter((d) => d.stage === st).length;
+            return (
+              <span key={st} className={n ? 'inline-flex items-center gap-1.5' : 'inline-flex items-center gap-1.5 opacity-40'}>
+                <span className="size-2 rounded-full" style={{ background: stageColor[st] }} />
+                {st} <span className="text-ink tabular-nums">{n}</span>
+              </span>
+            );
+          })}
+        </div>
+      )}
 
       <div className="flex-1 space-y-2 overflow-y-auto px-5 py-4">
         {list.map((d) => (
@@ -28,7 +48,7 @@ export function AssociatedDealsTab({
             >
               <div className="min-w-0">
                 <div className="flex items-center gap-2">
-                  <span className="truncate text-[14px] font-semibold text-ink">{d.company}</span>
+                  <span className="truncate text-[14px] font-semibold text-ink">{d.id}</span>
                   <span className="inline-flex items-center gap-1.5 text-[12px] text-muted">
                     <span className="size-2 rounded-full" style={{ background: stageColor[d.stage] }} />
                     {d.stage}
@@ -36,7 +56,7 @@ export function AssociatedDealsTab({
                 </div>
                 <div className="mt-0.5 flex items-center gap-1.5 text-[12px] text-muted">
                   <Ship size={13} className="shrink-0 text-faint" />
-                  {d.origin} → {d.destination}
+                  {d.origin} → {d.destination} · {d.teu} · {d.mode} · {d.contact}
                 </div>
               </div>
               <div className="shrink-0 text-right">

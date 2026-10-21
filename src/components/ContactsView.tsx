@@ -1,12 +1,28 @@
 import { Phone, Mail, Tag, Trash2 } from 'lucide-react';
-import { contacts, type ContactSummary } from '../data/contacts';
+import { type ContactSummary } from '../data/contacts';
 import { Button } from '@/components/ui/button';
+import { EngagedText } from './company/parts';
 import { RecordListView, type RecordColumn } from './record/RecordListView';
 
 const ALL_COLS: RecordColumn<ContactSummary>[] = [
   { key: 'name', label: 'Contact', flex: 1.2, render: (c) => <span className="truncate font-semibold text-ink">{c.name}</span> },
   { key: 'company', label: 'Company', flex: 1.1, render: (c) => <span className="truncate text-muted">{c.company}</span> },
-  { key: 'role', label: 'Role', flex: 1, render: (c) => <span className="truncate text-muted">{c.role}</span> },
+  { key: 'role', label: 'Designation', flex: 1, render: (c) => <span className="truncate text-muted">{c.role}</span> },
+  { key: 'contactRole', label: 'Contact role', flex: 0.8, render: (c) => <span className="truncate text-muted">{c.contactRole ?? '—'}</span> },
+  { key: 'modesHandled', label: 'Modes handled', flex: 0.8, render: (c) => <span className="truncate text-ink">{c.modesHandled ?? '—'}</span> },
+  {
+    key: 'lanesHandled',
+    label: 'Lanes handled',
+    flex: 1.2,
+    render: (c) => (
+      <span className="truncate text-muted" title={c.lanesHandled}>
+        {c.lanesHandled ?? '—'}
+      </span>
+    ),
+  },
+  { key: 'lastEngaged', label: 'Last engaged', flex: 0.8, render: (c) => <span className="text-[12px]"><EngagedText iso={c.lastEngagedAt} /></span> },
+  { key: 'status', label: 'Status', flex: 0.6, render: (c) => <span className="text-[12px] text-muted">{c.status ?? '—'}</span> },
+  { key: 'department', label: 'Department', flex: 0.9, render: (c) => <span className="truncate text-muted">{c.department ?? '—'}</span> },
   {
     key: 'email',
     label: 'Email',
@@ -31,7 +47,7 @@ const ALL_COLS: RecordColumn<ContactSummary>[] = [
   { key: 'location', label: 'Location', flex: 1, render: (c) => <span className="truncate text-muted">{c.location}</span> },
   { key: 'lastDealDate', label: 'Last deal', flex: 0.9, render: (c) => <span className="text-[12px] text-faint">{c.lastDealDate}</span> },
   { key: 'dealsCount', label: 'Deals', flex: 0.6, render: (c) => <span className="font-semibold text-ink">{c.dealsCount}</span> },
-  { key: 'owner', label: 'Owner', flex: 1, render: (c) => <span className="truncate text-muted">{c.owner}</span> },
+  { key: 'owner', label: 'Contact owner', flex: 1, render: (c) => <span className="truncate text-muted">{c.owner}</span> },
   { key: 'created', label: 'Created', flex: 0.9, render: (c) => <span className="text-[12px] text-faint">{c.created}</span> },
   {
     key: 'tags',
@@ -50,15 +66,15 @@ const ALL_COLS: RecordColumn<ContactSummary>[] = [
 ];
 
 /** Contacts list — a configuration of the shared RecordListView. */
-export function ContactsView({ onOpenContact }: { onOpenContact: (c: ContactSummary) => void }) {
+export function ContactsView({ contacts, onOpenContact }: { contacts: ContactSummary[]; onOpenContact: (c: ContactSummary) => void }) {
   return (
     <RecordListView
       title="Contacts"
       noun="contacts"
       rows={contacts}
       columns={ALL_COLS}
-      defaultColumns={['name', 'company', 'role', 'email', 'phone', 'lastDealDate', 'dealsCount']}
-      searchText={(c) => `${c.name} ${c.company} ${c.email}`}
+      defaultColumns={['name', 'company', 'contactRole', 'email', 'phone', 'modesHandled', 'lastEngaged', 'dealsCount', 'owner']}
+      searchText={(c) => `${c.name} ${c.company} ${c.email} ${c.modesHandled ?? ''} ${c.lanesHandled ?? ''}`}
       onOpen={onOpenContact}
       rowLabel={(c) => c.name}
       newLabel="New contact"
