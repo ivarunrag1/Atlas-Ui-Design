@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { Check, Pencil, X } from 'lucide-react';
+import { Check, Pencil, X, type LucideIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { SectionLabel } from '@/components/ui/field';
 import { ResizablePane } from '@/components/ui/resizable-pane';
@@ -147,4 +147,46 @@ function Fact({
   );
 }
 
-export { InfoPane, InfoHeader, InfoSection, EditActions, FactGrid, Fact, INFO_PANE_MIN, INFO_PANE_MAX };
+/** Stacked one-line facts (label left, value right) — for narrow panes. */
+function FactList({ className, ...props }: React.ComponentProps<'dl'>) {
+  return <dl data-slot="fact-list" className={cn('flex flex-col gap-2', className)} {...props} />;
+}
+
+/**
+ * One-line fact: icon + label on the left, value right-aligned (truncates; full value
+ * on hover). `wrap` lets the value wrap instead (e.g. a row of tag chips).
+ */
+function FactRow({
+  label,
+  icon: Icon,
+  title,
+  wrap = false,
+  className,
+  children,
+}: {
+  label: React.ReactNode;
+  /** Icon shown before the label (title side). */
+  icon?: LucideIcon;
+  /** Full value for the hover title when it may truncate. */
+  title?: string;
+  wrap?: boolean;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div data-slot="fact-row" className={cn('flex min-w-0 justify-between gap-3', wrap ? 'items-start' : 'items-center', className)}>
+      <dt className="flex shrink-0 items-center gap-1.5 text-[12px] text-faint">
+        {Icon && <Icon size={13} className="shrink-0 text-muted" />}
+        {label}
+      </dt>
+      <dd
+        className={cn('min-w-0 text-right text-[12px] text-ink', wrap ? 'flex flex-wrap justify-end gap-1' : 'truncate')}
+        title={title}
+      >
+        {children}
+      </dd>
+    </div>
+  );
+}
+
+export { InfoPane, InfoHeader, InfoSection, EditActions, FactGrid, Fact, FactList, FactRow, INFO_PANE_MIN, INFO_PANE_MAX };

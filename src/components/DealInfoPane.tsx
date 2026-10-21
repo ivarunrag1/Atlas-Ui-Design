@@ -1,11 +1,33 @@
 import { useState } from 'react';
-import { AlertTriangle, Ship, Container } from 'lucide-react';
+import {
+  AlertTriangle,
+  Ship,
+  Container,
+  User,
+  Hash,
+  Clock,
+  Percent,
+  CalendarCheck,
+  UserCheck,
+  CalendarClock,
+  Repeat,
+} from 'lucide-react';
 import { stageColor, type DealSummary } from '../data/deals';
+import { dealFields, isQuoted, type DealFieldValues } from '../data/dealFields';
+import { formatFieldValue } from './AttributesTab';
 import { Input } from '@/components/ui/input';
 import { Field } from '@/components/ui/field';
-import { InfoPane, InfoHeader, InfoSection, EditActions, FactGrid, Fact } from '@/components/ui/info-pane';
+import { InfoPane, InfoHeader, InfoSection, EditActions, FactList, FactRow } from '@/components/ui/info-pane';
 
-export function DealInfoPane({ deal }: { deal: DealSummary }) {
+export function DealInfoPane({ deal, fields }: { deal: DealSummary; fields: DealFieldValues }) {
+  // "Now" for the overdue check — read once (not during every render).
+  const [now] = useState(() => Date.now());
+  const fieldLabel = (key: string) => dealFields.find((f) => f.key === key)!;
+  const followUp = fields.next_followup_at;
+  const overdue = !!followUp && new Date(followUp).getTime() < now;
+  const buy = Number(fields.buy_value) || 0;
+  const margin = Number(fields.margin) || 0;
+  const quoted = isQuoted(deal); // deal value & quote fields exist from Quote sent onward
   const base = { name: deal.contact, role: deal.contactRole, email: deal.contactEmail };
   const [contact, setContact] = useState(base);
   const [draft, setDraft] = useState(base);
@@ -34,6 +56,13 @@ export function DealInfoPane({ deal }: { deal: DealSummary }) {
             </span>
           )}
         </div>
+        {/* Deal value only exists once the enquiry has been quoted. */}
+        {quoted && (
+          <div className="mt-2 flex items-baseline gap-2">
+            <span className="text-[12px] text-faint">Deal value</span>
+            <span className="text-[18px] font-semibold text-ink tabular-nums">{deal.value}</span>
+          </div>
+        )}
       </InfoHeader>
 
       <InfoSection title="Customer" onEdit={startEdit} editing={editing}>
@@ -61,32 +90,59 @@ export function DealInfoPane({ deal }: { deal: DealSummary }) {
         )}
       </InfoSection>
 
+      {/* Quote & follow-up — Atlas deal fields the spec puts in the left pane (once quoted) */}
+      {quoted && (
+        <InfoSection title="Quote & follow-up">
+          <FactList>
+            <FactRow icon={Percent} label="Margin" title={fieldLabel('margin').notes}>
+              {buy ? (
+                <>
+                  {formatFieldValue(fieldLabel('margin'), fields.margin)}
+                  <span className="text-faint"> · {((margin / buy) * 100).toFixed(1)}%</span>
+                </>
+              ) : (
+                '—'
+              )}
+            </FactRow>
+            <FactRow icon={CalendarCheck} label="Quoted at">
+              {formatFieldValue(fieldLabel('quoted_at'), fields.quoted_at)}
+            </FactRow>
+            <FactRow icon={UserCheck} label="Sales person quoted" title={fields.quoted_by}>
+              {fields.quoted_by || '—'}
+            </FactRow>
+            <FactRow icon={CalendarClock} label="Follow-up date" title={overdue ? 'Overdue' : undefined}>
+              <span className={overdue ? 'font-medium text-danger' : undefined}>
+                {formatFieldValue(fieldLabel('next_followup_at'), followUp)}
+                {overdue && ' · overdue'}
+              </span>
+            </FactRow>
+            <FactRow icon={Repeat} label="Follow-ups done">
+              {fields.followup_count || '0'}
+            </FactRow>
+          </FactList>
+        </InfoSection>
+      )}
+
       {/* Business / shipment */}
       <InfoSection>
-        <FactGrid>
-          <Fact label="Deal value">
-            <span className="text-[18px] font-bold">{deal.value}</span>
-          </Fact>
-          <Fact label="Trade lane">
-            <span className="inline-flex items-center gap-1.5">
-              <Ship size={15} className="text-muted" />
-              {deal.origin} → {deal.destination}
-            </span>
-          </Fact>
-          <Fact label="Containers">
-            <span className="inline-flex items-center gap-1.5">
-              <Container size={15} className="text-muted" />
-              {deal.teu} · {deal.equipment}
-            </span>
-          </Fact>
-          <Fact label="Owner">{deal.owner}</Fact>
-          <Fact label="Deal ID">
+        {/* One line per fact: label left, value right */}
+        <FactList>
+          <FactRow icon={Ship} label="Trade lane" title={`${deal.origin} → ${deal.destination}`}>
+            {deal.origin} → {deal.destination}
+          </FactRow>
+          <FactRow icon={Container} label="Containers" title={`${deal.teu} · ${deal.equipment}`}>
+            {deal.teu} · {deal.equipment}
+          </FactRow>
+          <FactRow icon={User} label="Owner">
+            {deal.owner}
+          </FactRow>
+          <FactRow icon={Hash} label="Deal ID">
             <span className="text-muted">{deal.id}</span>
-          </Fact>
-          <Fact label="Last updated">
+          </FactRow>
+          <FactRow icon={Clock} label="Last updated">
             <span className="text-muted">{deal.updated}</span>
-          </Fact>
-        </FactGrid>
+          </FactRow>
+        </FactList>
       </InfoSection>
     </InfoPane>
   );

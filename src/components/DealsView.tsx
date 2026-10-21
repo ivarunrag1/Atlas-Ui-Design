@@ -19,7 +19,8 @@ import {
 import { deals as seedDeals, stages, stageColor, type DealSummary, type Stage } from '../data/deals';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Card, cardVariants } from '@/components/ui/card';
+import { Card } from '@/components/ui/card';
+import { KanbanBoard, KanbanCard } from './record/KanbanBoard';
 import {
   DropdownMenu,
   DropdownMenuTrigger,
@@ -31,7 +32,6 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from '@/components/ui/dropdown-menu';
-import { cn } from '@/lib/utils';
 
 type ViewMode = 'kanban' | 'list';
 type SortKey = 'updated' | 'value' | 'company';
@@ -70,20 +70,16 @@ function StageDot({ stage }: { stage: Stage }) {
   return <span className="size-2 shrink-0 rounded-full" style={{ background: stageColor[stage] }} />;
 }
 
-/* ── Kanban card ───────────────────────────────────────────────────────────── */
+/* ── Kanban card (deal variant of the shared KanbanCard) ───────────────────── */
 
-function KanbanCard({
+function DealKanbanCard({
   deal,
   onOpen,
-  onDragStart,
-  onDragEnd,
   dragging,
   onAddComment,
 }: {
   deal: DealSummary;
   onOpen: (d: DealSummary) => void;
-  onDragStart: () => void;
-  onDragEnd: () => void;
   dragging: boolean;
   onAddComment: (id: string) => void;
 }) {
@@ -99,16 +95,7 @@ function KanbanCard({
   };
 
   return (
-    <Card
-      variant="nested"
-      interactive
-      draggable
-      onDragStart={onDragStart}
-      onDragEnd={onDragEnd}
-      onClick={() => onOpen(deal)}
-      className={cn('p-3', dragging && 'opacity-40')}
-      style={{ borderLeftWidth: 3, borderLeftColor: stageColor[deal.stage] }}
-    >
+    <KanbanCard accent={stageColor[deal.stage]} dragging={dragging} onClick={() => onOpen(deal)}>
       <div className="flex items-start justify-between gap-2">
         <span className="truncate text-[14px] font-semibold text-ink">{deal.company}</span>
         {deal.alert && <AlertTriangle size={14} className="mt-0.5 shrink-0 text-danger" />}
@@ -171,7 +158,7 @@ function KanbanCard({
           </Button>
         </div>
       )}
-    </Card>
+    </KanbanCard>
   );
 }
 
@@ -188,79 +175,14 @@ function Kanban({
   onAdd: (stage: Stage) => void;
   onAddComment: (id: string) => void;
 }) {
-  const [dragId, setDragId] = useState<string | null>(null);
-  const [overStage, setOverStage] = useState<Stage | null>(null);
-
   return (
-    <div className="flex h-full gap-4 overflow-x-auto px-5 py-4">
-      {columns.map(({ stage, deals }) => {
-        const over = overStage === stage;
-        return (
-          <div
-            key={stage}
-            onDragOver={(e) => {
-              e.preventDefault();
-              if (overStage !== stage) setOverStage(stage);
-            }}
-            onDragLeave={(e) => {
-              if (!e.currentTarget.contains(e.relatedTarget as Node)) setOverStage(null);
-            }}
-            onDrop={(e) => {
-              e.preventDefault();
-              if (dragId) onMove(dragId, stage);
-              setDragId(null);
-              setOverStage(null);
-            }}
-            className={cn(
-              cardVariants(),
-              'flex w-[290px] shrink-0 flex-col overflow-hidden transition-colors',
-              over && 'border-line-strong',
-            )}
-          >
-            {/* Column header — same frame as the tiles */}
-            <div className="flex items-center justify-between border-b border-line px-3 py-2">
-              <span className="flex items-center gap-2 text-[12px] font-semibold uppercase tracking-wide text-muted">
-                <StageDot stage={stage} />
-                {stage}
-                <span className="rounded-full border border-line px-1.5 text-[10px] font-semibold text-faint">
-                  {deals.length}
-                </span>
-              </span>
-              <Button
-                variant="ghost"
-                size="icon-xs"
-                onClick={() => onAdd(stage)}
-                aria-label={`Add deal to ${stage}`}
-                className="size-6 text-faint"
-              >
-                <Plus size={15} />
-              </Button>
-            </div>
-
-            {/* Tiles */}
-            <div className={`flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto p-2 ${over ? 'bg-subtle/40' : ''}`}>
-              {deals.map((d) => (
-                <KanbanCard
-                  key={d.id}
-                  deal={d}
-                  onOpen={onOpen}
-                  onAddComment={onAddComment}
-                  dragging={dragId === d.id}
-                  onDragStart={() => setDragId(d.id)}
-                  onDragEnd={() => {
-                    setDragId(null);
-                    setOverStage(null);
-                  }}
-                />
-              ))}
-              {deals.length === 0 && (
-                <div className="grid place-items-center py-8 text-[12px] text-faint">Drop deals here</div>
-              )}
-            </div>
-          </div>
-        );
-      })}
-    </div>
+    <KanbanBoard
+      noun="deal"
+      columns={columns.map(({ stage, deals }) => ({ key: stage, label: stage, color: stageColor[stage], items: deals }))}
+      onMove={(id, key) => onMove(id, key as Stage)}
+      onAdd={(key) => onAdd(key as Stage)}
+      renderCard={(d, { dragging }) => <DealKanbanCard deal={d} onOpen={onOpen} dragging={dragging} onAddComment={onAddComment} />}
+    />
   );
 }
 
