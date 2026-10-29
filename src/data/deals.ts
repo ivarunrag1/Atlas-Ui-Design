@@ -13,12 +13,12 @@ export type Stage = (typeof stages)[number];
 
 /** Colour code per stage — a small categorical accent (layout stays neutral). */
 export const stageColor: Record<Stage, string> = {
-  'In contact': '#64748b', // slate
-  'Enquiry received': '#3b82f6', // blue
-  Quoting: '#d97706', // amber
-  'Quote sent': '#a78bfa', // violet
-  Negotiation: '#6366f1', // indigo
-  Won: '#22c55e', // green
+  'In contact': 'var(--color-stage-slate)',
+  'Enquiry received': 'var(--color-stage-blue)',
+  Quoting: 'var(--color-stage-amber)',
+  'Quote sent': 'var(--color-stage-violet)',
+  Negotiation: 'var(--color-stage-coral)',
+  Won: 'var(--color-stage-green)',
 };
 
 /** A scheduled/past touchpoint or task — `when` is the headline, `detail` the sub-line. */

@@ -15,10 +15,10 @@ export type SyncStatus = 'PENDING' | 'SYNCED' | 'FAILED';
 
 export const accountStages: AccountStage[] = ['Prospect', 'Customer', 'Dormant', 'Lost'];
 export const accountStageColor: Record<AccountStage, string> = {
-  Prospect: '#3b82f6',
-  Customer: '#22c55e',
-  Dormant: '#d97706',
-  Lost: '#64748b',
+  Prospect: 'var(--color-stage-blue)',
+  Customer: 'var(--color-stage-green)',
+  Dormant: 'var(--color-stage-amber)',
+  Lost: 'var(--color-stage-slate)',
 };
 
 /** TradeMo trade profile for a company — read-only, never written into CRM fields. */

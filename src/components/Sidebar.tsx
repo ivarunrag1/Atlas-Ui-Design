@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
-import { Building2, LayoutDashboard, Target, Bot, Users, BarChart3, Settings, PanelLeftClose, PanelLeftOpen } from 'lucide-react';
+import { Building2, LayoutDashboard, Target, Bot, Users, BarChart3, Settings, PanelLeftClose, PanelLeftOpen, Moon, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Hint } from '@/components/ui/tooltip';
+import { Switch } from '@/components/ui/switch';
+import { useTheme } from '@/lib/use-theme';
 import { cn } from '@/lib/utils';
 
 const nav = [
@@ -57,6 +59,8 @@ export function Sidebar({
   onNavigate: (label: string) => void;
 }) {
   const [collapsed, setCollapsed] = useCollapsed();
+  const [theme, setTheme] = useTheme();
+  const dark = theme === 'dark';
 
   return (
     <aside
@@ -119,6 +123,26 @@ export function Sidebar({
             {!collapsed && 'Settings'}
           </a>
         </NavHint>
+
+        {/* Theme toggle — icon button when collapsed, labelled switch when expanded */}
+        {collapsed ? (
+          <Hint label="Theme" value={dark ? 'Switch to light' : 'Switch to dark'} side="right">
+            <Button
+              variant="ghost"
+              onClick={() => setTheme(dark ? 'light' : 'dark')}
+              aria-label={dark ? 'Switch to light mode' : 'Switch to dark mode'}
+              className="size-9 justify-center p-0"
+            >
+              {dark ? <Moon size={18} /> : <Sun size={18} />}
+            </Button>
+          </Hint>
+        ) : (
+          <label className="flex cursor-pointer items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-muted hover:bg-subtle">
+            {dark ? <Moon size={18} /> : <Sun size={18} />}
+            <span className="flex-1">Dark mode</span>
+            <Switch checked={dark} onCheckedChange={(on) => setTheme(on ? 'dark' : 'light')} aria-label="Dark mode" />
+          </label>
+        )}
 
         {collapsed ? (
           <Hint label="Agents" value="Auto" side="right">

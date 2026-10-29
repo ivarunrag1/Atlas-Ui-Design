@@ -12,12 +12,12 @@ export type TradeDirection = 'Importer' | 'Exporter' | 'Both';
 export const leadStatuses: LeadStatus[] = ['New', 'Contacted', 'In discussion', 'Nurturing', 'Qualified', 'Unqualified'];
 
 export const leadStatusColor: Record<LeadStatus, string> = {
-  New: '#60a5fa',
-  Contacted: '#a78bfa',
-  'In discussion': '#f59e0b',
-  Nurturing: '#2dd4bf',
-  Qualified: '#22c55e',
-  Unqualified: '#6b7280',
+  New: 'var(--color-stage-blue)',
+  Contacted: 'var(--color-stage-violet)',
+  'In discussion': 'var(--color-stage-amber)',
+  Nurturing: 'var(--color-stage-coral)',
+  Qualified: 'var(--color-stage-green)',
+  Unqualified: 'var(--color-stage-slate)',
 };
 
 /** Country-to-country lanes this forwarder serves (its network) — drives "lane coverage". */

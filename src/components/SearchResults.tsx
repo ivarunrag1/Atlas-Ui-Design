@@ -149,7 +149,7 @@ export function RecapRow({
  */
 export function StickyHeader({ children }: { children: React.ReactNode }) {
   return (
-    <div className="sticky top-0 z-10 -mx-5 border-y border-line-strong bg-subtle shadow-[0_6px_12px_-8px_rgba(0,0,0,0.6)]">
+    <div className="sticky top-0 z-10 -mx-5 border-y border-line-strong bg-subtle shadow-[0_6px_12px_-8px_var(--color-shadow)]">
       {children}
     </div>
   );

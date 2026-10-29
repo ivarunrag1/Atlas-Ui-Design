@@ -345,7 +345,7 @@ function QuoteFooter({
   const lo = Math.min(...sells);
   const hi = Math.max(...sells);
   return (
-    <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-line-strong bg-subtle px-5 py-3 shadow-[0_-6px_12px_-8px_rgba(0,0,0,0.6)]">
+    <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-line-strong bg-subtle px-5 py-3 shadow-[0_-6px_12px_-8px_var(--color-shadow)]">
       <span className="text-[12px] text-muted">
         <span className="text-ink">
           {count} rate{count === 1 ? '' : 's'}
@@ -373,7 +373,7 @@ function QuoteFooter({
 /** Step 4 footer — quote summary + Send quote, pinned to the bottom of the page. */
 function SendFooter({ summary, valid, onSend }: { summary: React.ReactNode; valid: boolean; onSend: () => void }) {
   return (
-    <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-line-strong bg-subtle px-5 py-3 shadow-[0_-6px_12px_-8px_rgba(0,0,0,0.6)]">
+    <div className="flex shrink-0 flex-wrap items-center justify-between gap-3 border-t border-line-strong bg-subtle px-5 py-3 shadow-[0_-6px_12px_-8px_var(--color-shadow)]">
       <span className="text-[12px] text-muted">{summary}</span>
       <Button onClick={onSend} disabled={!valid} className="bg-success text-canvas hover:bg-success/90">
         <SendHorizontal size={14} /> Send quote
