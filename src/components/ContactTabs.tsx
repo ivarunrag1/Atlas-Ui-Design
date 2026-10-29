@@ -75,6 +75,40 @@ function OverviewTab({ contact, org }: { contact: ContactSummary; org?: Organiza
         </AttributeSection>
       )}
 
+      {/* Research (ZoomInfo) — read-only, refreshed on re-enrich */}
+      {contact.enrichment ? (
+        <AttributeSection title="Research" description={`ZoomInfo · enriched on ${fmtDate(contact.enrichedAt)}`}>
+          <AttributeRow label="Title" lockedBy="ZoomInfo">
+            {contact.enrichment.title}
+          </AttributeRow>
+          <AttributeRow label="Seniority" lockedBy="ZoomInfo">
+            {contact.enrichment.seniority}
+          </AttributeRow>
+          <AttributeRow label="Department" lockedBy="ZoomInfo">
+            {contact.enrichment.department}
+          </AttributeRow>
+          <AttributeRow label="Time in role" lockedBy="ZoomInfo">
+            {contact.enrichment.tenure ?? '—'}
+          </AttributeRow>
+          <AttributeRow label="LinkedIn" lockedBy="ZoomInfo">
+            {contact.enrichment.linkedin ?? '—'}
+          </AttributeRow>
+        </AttributeSection>
+      ) : (
+        <Card className="flex items-center justify-between gap-4 p-4">
+          <div className="flex min-w-0 items-start gap-3">
+            <ScanSearch size={16} className="mt-0.5 shrink-0 text-muted" />
+            <div className="min-w-0">
+              <div className="text-[14px] text-ink">Not enriched yet</div>
+              <div className="text-[12px] text-faint">Pull title, seniority and LinkedIn from ZoomInfo. Uses one credit; skipped if this person was enriched before.</div>
+            </div>
+          </div>
+          <Button variant="secondary" size="sm" className="shrink-0">
+            <ScanSearch size={14} /> Enrich
+          </Button>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>Signals</CardTitle>
@@ -99,49 +133,6 @@ function OverviewTab({ contact, org }: { contact: ContactSummary; org?: Organiza
           )}
         </div>
       </Card>
-    </TabBody>
-  );
-}
-
-/* ── Research (ZoomInfo) ───────────────────────────────────────────────────── */
-
-function ResearchTab({ contact }: { contact: ContactSummary }) {
-  const e = contact.enrichment;
-  return (
-    <TabBody title="Research" description={contact.enrichedAt ? `ZoomInfo · enriched on ${fmtDate(contact.enrichedAt)}` : 'ZoomInfo enrichment'}>
-      {e ? (
-        <AttributeSection title="ZoomInfo" description="Read-only — refreshed on re-enrich">
-          <AttributeRow label="Title" lockedBy="ZoomInfo">
-            {e.title}
-          </AttributeRow>
-          <AttributeRow label="Seniority" lockedBy="ZoomInfo">
-            {e.seniority}
-          </AttributeRow>
-          <AttributeRow label="Department" lockedBy="ZoomInfo">
-            {e.department}
-          </AttributeRow>
-          <AttributeRow label="Time in role" lockedBy="ZoomInfo">
-            {e.tenure ?? '—'}
-          </AttributeRow>
-          <AttributeRow label="LinkedIn" lockedBy="ZoomInfo">
-            {e.linkedin ?? '—'}
-          </AttributeRow>
-          <AttributeRow label="Enriched on" lockedBy="ZoomInfo">
-            {fmtDate(contact.enrichedAt)}
-          </AttributeRow>
-        </AttributeSection>
-      ) : (
-        <Card className="flex flex-col items-center gap-3 p-6 text-center">
-          <ScanSearch size={20} className="text-muted" />
-          <div>
-            <div className="text-[14px] text-ink">Not enriched yet</div>
-            <div className="text-[12px] text-faint">Pull title, seniority and LinkedIn from ZoomInfo. Uses one credit; skipped if this person was enriched before.</div>
-          </div>
-          <Button variant="secondary" size="sm">
-            <ScanSearch size={14} /> Enrich with ZoomInfo
-          </Button>
-        </Card>
-      )}
     </TabBody>
   );
 }
@@ -172,7 +163,6 @@ export function ContactTabs({
           count: myDeals.length,
           content: <AssociatedDealsTab deals={myDeals} forName={contact.name} onOpenDeal={onOpenDeal} />,
         },
-        { key: 'research', label: 'Research', icon: ScanSearch, content: <ResearchTab contact={contact} /> },
         {
           key: 'emails',
           label: 'Emails',

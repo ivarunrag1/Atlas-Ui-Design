@@ -50,7 +50,7 @@ function Divider() {
 /** Carrier logo — the image on a white tile when available, otherwise a code tile. */
 export function CarrierLogo({ rate }: { rate: RateCard }) {
   return rate.logoUrl ? (
-    <span className="grid h-6 w-16 shrink-0 place-items-center overflow-hidden rounded-[6px] bg-white px-1">
+    <span className="grid h-6 w-16 shrink-0 place-items-center overflow-hidden rounded-[6px] bg-paper px-1">
       <img src={rate.logoUrl} alt={rate.carrier} className="max-h-full max-w-full object-contain" />
     </span>
   ) : (

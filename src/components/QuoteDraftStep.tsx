@@ -19,7 +19,7 @@ const daysBetween = (a: string, b: string) =>
 
 /** Bar standing in for a line of text on the mock page. */
 function Line({ w, strong }: { w: string; strong?: boolean }) {
-  return <span className={cn('block h-1.5 rounded-full', strong ? 'bg-neutral-400' : 'bg-neutral-200')} style={{ width: w }} />;
+  return <span className={cn('block h-1.5 rounded-full', strong ? 'bg-paper-line-strong' : 'bg-paper-line')} style={{ width: w }} />;
 }
 
 function PdfPreview({ fileName }: { fileName: string }) {
@@ -35,9 +35,9 @@ function PdfPreview({ fileName }: { fileName: string }) {
       </CardHeader>
       <div className="bg-subtle/40 p-4">
         {/* A4 page mock */}
-        <div className="relative mx-auto aspect-[1/1.414] w-full max-w-[360px] rounded-[4px] bg-white p-6 shadow-xl">
+        <div className="relative mx-auto aspect-[1/1.414] w-full max-w-[360px] rounded-[4px] bg-paper p-6 shadow-xl">
           <div className="flex items-start justify-between">
-            <span className="grid size-8 place-items-center rounded-[4px] bg-neutral-800 text-[12px] font-bold text-white">Q</span>
+            <span className="grid size-8 place-items-center rounded-[4px] bg-paper-ink text-[12px] font-bold text-paper">Q</span>
             <span className="space-y-1 text-right">
               <Line w="5rem" strong />
               <Line w="3.5rem" />
@@ -48,7 +48,7 @@ function PdfPreview({ fileName }: { fileName: string }) {
             <Line w="70%" />
             <Line w="60%" />
           </div>
-          <div className="mt-5 space-y-1.5 rounded-[3px] border border-neutral-200 p-2">
+          <div className="mt-5 space-y-1.5 rounded-[3px] border border-paper-line p-2">
             {['90%', '82%', '88%', '76%', '84%'].map((w, i) => (
               <Line key={i} w={w} strong={i === 0} />
             ))}
@@ -58,7 +58,7 @@ function PdfPreview({ fileName }: { fileName: string }) {
             <Line w="80%" />
             <Line w="65%" />
           </div>
-          <span className="absolute inset-x-0 bottom-4 text-center text-[10px] text-neutral-400">PDF preview placeholder</span>
+          <span className="absolute inset-x-0 bottom-4 text-center text-[10px] text-paper-faint">PDF preview placeholder</span>
         </div>
       </div>
     </Card>
