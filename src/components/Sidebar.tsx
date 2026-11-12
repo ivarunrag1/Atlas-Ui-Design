@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Building2, LayoutDashboard, Target, Bot, Users, BarChart3, Settings, PanelLeftClose, PanelLeftOpen, Moon, Sun } from 'lucide-react';
+import { Building2, Gauge, LayoutDashboard, Target, Bot, Users, BarChart3, Settings, PanelLeftClose, PanelLeftOpen, Moon, Sun } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Hint } from '@/components/ui/tooltip';
 import { Switch } from '@/components/ui/switch';
@@ -7,6 +7,7 @@ import { useTheme } from '@/lib/use-theme';
 import { cn } from '@/lib/utils';
 
 const nav = [
+  { icon: Gauge, label: 'Dashboard' },
   { icon: LayoutDashboard, label: 'Pipeline' },
   { icon: Target, label: 'Leads' },
   { icon: Bot, label: 'Agents' },
