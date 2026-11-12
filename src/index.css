@@ -11,13 +11,13 @@
      Values follow the token sheet (Screenshot 2026-10-23). */
 
   /* Surfaces */
-  --color-canvas: #15171b; /* app background */
-  --color-surface: #1b1e23; /* panels and cards */
-  --color-subtle: #23272d; /* insets and hover */
+  --color-canvas: #121212; /* app background (overrides the sheet's #15171B) */
+  --color-surface: #0a0a0a; /* panels and cards (overrides the sheet's #1B1E23) */
+  --color-subtle: #2a2a2e; /* insets and hover (overrides the sheet's #23272D) */
 
   /* Borders */
-  --color-line: #2e333a; /* default border */
-  --color-line-strong: #424851; /* strong border */
+  --color-line: #3f3f46; /* default border (overrides the sheet's #2E333A) */
+  --color-line-strong: #52525b; /* strong border (overrides the sheet's #424851) */
 
   /* Text */
   --color-ink: #dde1e6; /* text, primary */

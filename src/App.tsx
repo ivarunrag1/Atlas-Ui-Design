@@ -15,6 +15,7 @@ import { contacts as seedContacts, type ContactSummary } from './data/contacts';
 import { leads as seedLeads, type LeadSummary } from './data/leads';
 import { organizations as seedOrganizations, type Organization } from './data/organizations';
 import { CompaniesView } from './components/CompaniesView';
+import { DashboardView } from './components/DashboardView';
 import { CompanyInfoPane } from './components/CompanyInfoPane';
 import { CompanyTabs } from './components/CompanyTabs';
 import { convertLead, type ConvertInput } from './data/convert';
@@ -25,7 +26,7 @@ import { LeadTabs } from './components/LeadTabs';
 import { AgentProvider, type AgentScope } from './lib/agent-context';
 import { FocusProvider } from './lib/focus-context';
 
-type View = 'pipeline' | 'deal' | 'leads' | 'lead' | 'contacts' | 'contact' | 'companies' | 'company';
+type View = 'dashboard' | 'pipeline' | 'deal' | 'leads' | 'lead' | 'contacts' | 'contact' | 'companies' | 'company';
 
 export default function App() {
   const [view, setView] = useState<View>('pipeline');
@@ -64,7 +65,8 @@ export default function App() {
   const [converting, setConverting] = useState(false);
 
   const navigate = (label: string) => {
-    if (label === 'Pipeline') setView('pipeline');
+    if (label === 'Dashboard') setView('dashboard');
+    else if (label === 'Pipeline') setView('pipeline');
     else if (label === 'Leads') setView('leads');
     else if (label === 'Contacts') setView('contacts');
     else if (label === 'Companies') setView('companies');
@@ -99,7 +101,9 @@ export default function App() {
         ? 'Companies'
         : view === 'leads' || view === 'lead'
           ? 'Leads'
-          : 'Pipeline';
+          : view === 'dashboard'
+            ? 'Dashboard'
+            : 'Pipeline';
 
   // Atlas deal field values per deal — shared by the left pane and the Attributes tab.
   const [fieldEdits, setFieldEdits] = useState<Record<string, DealFieldValues>>({});
@@ -165,6 +169,21 @@ export default function App() {
       <div className="flex h-screen bg-canvas text-ink">
         {!focusOn && <Sidebar active={activeNav} onNavigate={navigate} />}
 
+        {view === 'dashboard' && (
+          <>
+            <DashboardView
+              deals={dealItems}
+              fieldsFor={fieldsFor}
+              organizations={organizations}
+              leads={leadItems}
+              onOpenDeal={openDeal}
+              onOpenCompany={openCompany}
+              onOpenLead={openLead}
+            />
+            {/* Chat opens here only from "Ask Atlas" */}
+            {chatOpen && agentScope && <AgentChat open onClose={() => setChatOpen(false)} onRecord={recordActivity} />}
+          </>
+        )}
         {view === 'pipeline' && <DealsView items={dealItems} setItems={setDealItems} onOpenDeal={openDeal} />}
         {view === 'leads' && <LeadsView items={leadItems} setItems={setLeadItems} onOpenLead={openLead} />}
         {view === 'contacts' && <ContactsView contacts={contactItems} onOpenContact={openContact} />}
