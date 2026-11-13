@@ -11,7 +11,7 @@ import {
   ListTodo,
   Mail,
   Route,
-  Sparkles,
+ 
   StickyNote,
   Ticket,
   TrendingDown,
@@ -34,6 +34,7 @@ import { EmailThread } from './EmailThread';
 import { TasksTab } from './TasksTab';
 import { CommentsTab } from './CommentsTab';
 import { dormantIn, EngagedText, LaneText, money, RenewalText, splitList, StagePill, SyncText } from './company/parts';
+import { AgentAvatar } from './AgentAvatar';
 import { cn } from '@/lib/utils';
 
 const pct = (n: number) => `${Math.round(n * 100)}%`;
@@ -99,8 +100,8 @@ function OverviewTab({ org }: { org: Organization }) {
       {org.aiSummary && (
         <Card className="space-y-2 p-4">
           <div className="flex items-center gap-2">
-            <Sparkles size={14} className="text-atlas" />
-            <span className="text-[12px] text-atlas">AI summary</span>
+            <AgentAvatar agent="maya" size={24} />
+            <span className="text-[12px] text-atlas">AI summary · by Maya</span>
           </div>
           <p className="text-[14px] leading-relaxed text-ink/90">{org.aiSummary}</p>
         </Card>

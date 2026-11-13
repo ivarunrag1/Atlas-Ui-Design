@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/ai/prompt-input';
 import { Suggestion, Suggestions } from '@/components/ui/ai/suggestion';
 import { ActivityItem } from './activity';
+import { AgentAvatar } from './AgentAvatar';
 import { useAgent, type AgentScope } from '@/lib/agent-context';
 
 /** Reply when the panel is scoped (e.g. to a rate's charges) — acts, then reports. */
@@ -23,6 +24,7 @@ function buildScopedReply(now: number, scope: AgentScope, result: string | null)
         id: `tr${now}`,
         type: 'chat',
         actor: 'atlas',
+        agent: 'max',
         title: 'Updated charges',
         detail: result,
         timestamp: 'Just now',
@@ -36,6 +38,7 @@ function buildScopedReply(now: number, scope: AgentScope, result: string | null)
         id: `tr${now}`,
         type: 'chat',
         actor: 'atlas',
+        agent: 'max',
         title: "Couldn't map that to a charge",
         detail: `Try one of: ${(scope.suggestions ?? []).join(' · ')}`,
         timestamp: 'Just now',
@@ -48,6 +51,7 @@ function buildReply(now: number): Activity {
     id: `tr${now}`,
     type: 'chat',
     actor: 'atlas',
+    agent: 'max',
     title: 'Reviewed your request',
     detail: 'Queued the action and logged each step to the activity tab.',
     timestamp: 'Just now',
@@ -129,7 +133,7 @@ export function AgentChat({
               </Message>
             ) : (
               <Message key={m.id} from="assistant">
-                <MessageAvatar name="Atlas" fallback={<Sparkles size={12} />} className="border-atlas/40 text-atlas" />
+                <AgentAvatar agent={m.agent ?? 'max'} size={28} />
                 <MessageContent>
                   <p>{m.body}</p>
                   <MessageMeta>{m.timestamp}</MessageMeta>

@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { Lock, Send } from 'lucide-react';
 import { comments as seed, type Comment } from '../data/deal';
-import { Avatar, Chip, actorStyle } from './ui';
+import { Avatar, Chip } from './ui';
+import { agents } from '../data/agents';
 import { Button } from '@/components/ui/button';
 import { Composer } from '@/components/ui/textarea';
 import { Card } from '@/components/ui/card';
@@ -42,15 +43,11 @@ export function CommentsTab() {
       <div className="flex-1 space-y-3 overflow-y-auto px-5 py-4">
         {comments.map((c) => (
           <div key={c.id} className="flex gap-3">
-            <Avatar initials={c.from.initials} actor={c.from.actor} />
+            <Avatar initials={c.from.initials} actor={c.from.actor} agent={c.from.agent} />
             <Card className="min-w-0 flex-1 px-4 py-3">
               <div className="flex items-center gap-2">
                 <span className="text-[14px] font-semibold text-ink">{c.from.name}</span>
-                {c.from.actor === 'atlas' && (
-                  <span className={`text-[10px] font-medium ${actorStyle[c.from.actor].fg}`}>
-                    AI
-                  </span>
-                )}
+                {c.from.agent && <span className="text-[10px] font-medium text-faint">{agents[c.from.agent].role.split(' · ')[0]}</span>}
                 <span className="ml-auto text-[12px] text-faint">{c.timestamp}</span>
               </div>
               <p className="mt-1 text-[14px] leading-relaxed text-ink/90">{c.body}</p>

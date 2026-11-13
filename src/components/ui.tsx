@@ -1,5 +1,6 @@
-import { Sparkles } from 'lucide-react';
 import type { Actor } from '../data/deal';
+import { agents, type AgentId } from '../data/agents';
+import { AgentAvatar } from './AgentAvatar';
 import { cn } from '@/lib/utils';
 
 /**
@@ -7,30 +8,37 @@ import { cn } from '@/lib/utils';
  * transparent/dark background rather than filled tints.
  */
 export const actorStyle: Record<Actor, { fg: string; border: string; label: string }> = {
-  atlas: { fg: 'text-atlas', border: 'border-atlas/40', label: 'Atlas · AI' },
+  atlas: { fg: 'text-atlas', border: 'border-atlas/40', label: 'Agent' },
   system: { fg: 'text-muted', border: 'border-line', label: 'System' },
   you: { fg: 'text-ink', border: 'border-line-strong', label: 'Varun Reddy' },
   customer: { fg: 'text-ink', border: 'border-line-strong', label: 'Customer' },
 };
 
+/** Display name for an actor — the agent's name for agent actions. */
+export const actorLabel = (actor: Actor, agent?: AgentId) => (actor === 'atlas' ? agents[agent ?? 'max'].name : actorStyle[actor].label);
+
 export function Avatar({
   initials,
   actor,
+  agent,
   size = 36,
 }: {
   initials: string;
   actor: Actor;
+  /** Which agent, for agent actions (defaults to Max). */
+  agent?: AgentId;
   size?: number;
 }) {
   const s = actorStyle[actor];
-  const isAgent = actor === 'atlas';
+  // Agent actions show that agent's portrait
+  if (actor === 'atlas') return <AgentAvatar agent={agent ?? 'max'} size={size} />;
   return (
     <div
       className={cn('grid shrink-0 place-items-center rounded-full border bg-transparent font-semibold', s.border, s.fg)}
       style={{ width: size, height: size, fontSize: size * 0.4 }}
       title={s.label}
     >
-      {isAgent ? <Sparkles size={Math.round(size * 0.5)} /> : initials}
+      {initials}
     </div>
   );
 }

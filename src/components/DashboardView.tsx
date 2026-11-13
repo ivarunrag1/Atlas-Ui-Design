@@ -178,8 +178,8 @@ function TodayTile({ icon: Icon, label, value, sub, tone }: { icon: LucideIcon; 
 
 function AgentTag({ agent }: { agent: Agent }) {
   return (
-    <span className="inline-flex items-center gap-1 rounded-full border border-line py-0.5 pr-1.5 pl-0.5 text-[10px] text-muted">
-      <AgentAvatar agent={AGENT_ID[agent]} size={16} />
+    <span className="inline-flex items-center gap-2 rounded-full border border-line py-0.5 pr-3 pl-0.5 text-[14px] font-medium text-muted">
+      <AgentAvatar agent={AGENT_ID[agent]} size={32} />
       {agent}
     </span>
   );
@@ -230,7 +230,7 @@ function AgentCard({
   return (
     <Card className="flex flex-col gap-3 p-4">
       <div className="flex items-center gap-2.5">
-        <AgentAvatar agent={AGENT_ID[agent]} size={40} />
+        <AgentAvatar agent={AGENT_ID[agent]} size={48} />
         <div>
           <div className="text-[14px] font-semibold text-ink">{agent}</div>
           <div className="text-[12px] text-faint">{role}</div>

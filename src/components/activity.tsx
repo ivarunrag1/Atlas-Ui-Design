@@ -17,7 +17,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import type { Activity, ActivityStep, ActivityType, Actor } from '../data/deal';
-import { Avatar, actorStyle } from './ui';
+import { Avatar, actorLabel } from './ui';
 
 const actorInitial: Record<Actor, string> = { atlas: 'A', system: 'S', you: 'V', customer: 'M' };
 
@@ -99,9 +99,9 @@ export function ActivityItem({
   if (compact) {
     return (
       <div className="flex items-center gap-2 py-1">
-        <Avatar initials={actorInitial[item.actor]} actor={item.actor} size={18} />
+        <Avatar initials={actorInitial[item.actor]} actor={item.actor} agent={item.agent} size={22} />
         <span className="min-w-0 flex-1 truncate text-[14px]">
-          <span className="font-medium text-ink">{actorStyle[item.actor].label}</span>{' '}
+          <span className="font-medium text-ink">{actorLabel(item.actor, item.agent)}</span>{' '}
           <span className="text-muted">{item.title}</span>
         </span>
         {pending && (
@@ -131,8 +131,8 @@ export function ActivityItem({
         </div>
         {item.detail && <p className="mt-1.5 text-[12px] leading-snug text-muted">{item.detail}</p>}
         <div className="mt-1 flex items-center gap-1.5 text-[10px] text-muted">
-          <Avatar initials={actorInitial[item.actor]} actor={item.actor} size={16} />
-          <span className="font-medium">{actorStyle[item.actor].label}</span>
+          <Avatar initials={actorInitial[item.actor]} actor={item.actor} agent={item.agent} size={20} />
+          <span className="font-medium">{actorLabel(item.actor, item.agent)}</span>
           <span className="text-faint">·</span>
           <span className="text-faint">{item.timestamp}</span>
         </div>
@@ -176,8 +176,8 @@ export function ActivityItem({
           <p className="mt-0.5 text-[12px] leading-snug text-muted">{item.detail}</p>
         )}
         <div className="mt-1 flex items-center gap-1.5 text-[10px] text-muted">
-          <Avatar initials={actorInitial[item.actor]} actor={item.actor} size={16} />
-          <span className="font-medium">{actorStyle[item.actor].label}</span>
+          <Avatar initials={actorInitial[item.actor]} actor={item.actor} agent={item.agent} size={20} />
+          <span className="font-medium">{actorLabel(item.actor, item.agent)}</span>
           <span className="text-faint">·</span>
           <span className="text-faint">{item.timestamp}</span>
         </div>

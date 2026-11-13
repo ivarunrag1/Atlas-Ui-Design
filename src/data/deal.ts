@@ -7,8 +7,12 @@
  *   - `activity`  → agent / system audit trail (right rail)
  * Activity items may reference the message they produced via `linkedMessageId`.
  *
- * There is a single AI agent across the product: Atlas.
+ * AI work is done by three agents (Rhea · SDR, Max · sales & quote, Maya · CRM);
+ * `actor: 'atlas'` marks an agent action and `agent` says which one. "Ask Atlas" is
+ * only the chat entry point.
  */
+
+import type { AgentId } from './agents';
 
 export type Actor = 'atlas' | 'system' | 'you' | 'customer';
 
@@ -17,6 +21,8 @@ export interface Party {
   /** Short label shown on the avatar. */
   initials: string;
   actor: Actor;
+  /** Which agent, when actor is 'atlas'. */
+  agent?: AgentId;
 }
 
 export interface Attachment {
@@ -61,6 +67,8 @@ export interface Activity {
   id: string;
   type: ActivityType;
   actor: Actor;
+  /** Which agent, when actor is 'atlas'. */
+  agent?: AgentId;
   title: string;
   detail?: string;
   timestamp: string;
@@ -73,7 +81,7 @@ export const deal = {
   id: 'AT-DEAL-0142',
   company: 'Orbit Manufacturing',
   stage: 'Quote sent',
-  owner: { name: 'Atlas', initials: 'A', actor: 'atlas' as Actor },
+  owner: { name: 'Max', initials: 'M', actor: 'atlas' as Actor, agent: 'max' as AgentId },
   mode: 'Auto' as 'Auto' | 'Manual',
   temperature: 'Hot' as 'Hot' | 'Warm' | 'Cold',
   value: '$96,000',
@@ -81,7 +89,7 @@ export const deal = {
   teu: '18 TEU',
   equipment: "40'HC ×9",
   status: 'Quote sent',
-  alert: { label: 'No reply · 4 days', by: 'Atlas', ago: '2h ago' },
+  alert: { label: 'No reply · 4 days', by: 'Maya', ago: '2h ago' },
   contact: {
     name: 'Marcus Reed',
     role: 'Procurement Lead',
@@ -94,7 +102,8 @@ export const deal = {
   },
 };
 
-const atlas: Party = { name: 'Atlas', initials: 'A', actor: 'atlas' };
+const rhea: Party = { name: 'Rhea', initials: 'R', actor: 'atlas', agent: 'rhea' };
+const max: Party = { name: 'Max', initials: 'M', actor: 'atlas', agent: 'max' };
 const customer: Party = { name: 'Marcus Reed', initials: 'M', actor: 'customer' };
 
 export const messages: Message[] = [
@@ -110,7 +119,7 @@ export const messages: Message[] = [
   },
   {
     id: 'm2',
-    from: atlas,
+    from: rhea,
     to: 'Marcus Reed',
     timestamp: '8 days ago · Mon 09:14',
     body: [
@@ -121,7 +130,7 @@ export const messages: Message[] = [
   },
   {
     id: 'm3',
-    from: atlas,
+    from: max,
     to: 'Marcus Reed',
     timestamp: '4 days ago · Fri 11:30',
     body: [
@@ -135,7 +144,7 @@ export const messages: Message[] = [
   },
   {
     id: 'draft',
-    from: atlas,
+    from: max,
     to: 'Marcus Reed',
     timestamp: 'Scheduled · sends in 2h',
     body: [
@@ -151,6 +160,8 @@ export interface DealDocument {
   kind: 'Quote' | 'Packing list' | 'B/L draft' | 'Invoice';
   meta: string;
   by: Actor;
+  /** Which agent, when by is 'atlas'. */
+  agent?: AgentId;
   timestamp: string;
   receipt?: string;
 }
@@ -162,6 +173,7 @@ export const documents: DealDocument[] = [
     kind: 'Quote',
     meta: '$96,000 · 18 TEU · 240 KB',
     by: 'atlas',
+    agent: 'max',
     timestamp: 'Sent 4d ago',
   },
   {
@@ -178,6 +190,7 @@ export const documents: DealDocument[] = [
     kind: 'B/L draft',
     meta: 'Not yet issued · 180 KB',
     by: 'atlas',
+    agent: 'max',
     timestamp: 'Drafted 4d ago',
   },
 ];
@@ -200,7 +213,7 @@ export const comments: Comment[] = [
   },
   {
     id: 'c2',
-    from: { name: 'Atlas', initials: 'A', actor: 'atlas' },
+    from: { name: 'Maya', initials: 'M', actor: 'atlas', agent: 'maya' },
     body: 'Noted. I’ve kept the rate valid for 14 days and flagged the deal if no reply by Friday.',
     timestamp: '3d ago',
     internal: true,
@@ -210,6 +223,8 @@ export const comments: Comment[] = [
 export interface ChatMessage {
   id: string;
   from: 'you' | 'atlas';
+  /** Which agent answered (Ask Atlas routes to the right one). */
+  agent?: AgentId;
   timestamp: string;
   /** User turns (and simple agent text) use this. */
   body?: string;
@@ -232,6 +247,7 @@ export const agentChat: ChatMessage[] = [
       id: 'tr1',
       type: 'convert',
       actor: 'atlas',
+      agent: 'max',
       title: 'Checked sailing availability',
       detail:
         'The early-Nov slot can be held through Friday if Marcus confirms. I can extend the quote validity to match — want me to add that to the follow-up?',
@@ -257,6 +273,7 @@ export const activity: Activity[] = [
     id: 'a1',
     type: 'draft',
     actor: 'atlas',
+    agent: 'max',
     title: 'Follow-up drafted — awaiting review',
     detail: 'Deal is cooling after 4 days of no reply. Auto-sends in 2h unless you edit or pause.',
     timestamp: '2h ago',
@@ -266,6 +283,7 @@ export const activity: Activity[] = [
     id: 'a2',
     type: 'flag',
     actor: 'atlas',
+    agent: 'maya',
     title: 'Flagged: no reply for 4 days',
     detail: 'Atlas recommends a follow-up — the deal is cooling.',
     timestamp: '2h ago',
@@ -281,6 +299,7 @@ export const activity: Activity[] = [
     id: 'a3',
     type: 'sent',
     actor: 'atlas',
+    agent: 'max',
     title: 'Quote #Q-0142 sent to Marcus Reed',
     detail: 'Auto-sent after the preview window closed.',
     timestamp: '4d ago',
@@ -317,6 +336,7 @@ export const activity: Activity[] = [
     id: 'a4',
     type: 'draft',
     actor: 'atlas',
+    agent: 'max',
     title: 'Quote drafted — $96,000 · 18 TEU',
     detail: 'INNSA → DEHAM · 40′HC ×9',
     timestamp: '4d ago',
@@ -339,6 +359,7 @@ export const activity: Activity[] = [
     id: 'a6',
     type: 'convert',
     actor: 'atlas',
+    agent: 'rhea',
     title: 'Enquiry received',
     detail: 'Atlas converted the inbound lead into an enquiry.',
     timestamp: '6d ago',
@@ -348,6 +369,7 @@ export const activity: Activity[] = [
     id: 'a7',
     type: 'capture',
     actor: 'atlas',
+    agent: 'rhea',
     title: 'Lead captured from web form',
     detail: 'Atlas enriched company + contact details automatically.',
     timestamp: '8d ago',

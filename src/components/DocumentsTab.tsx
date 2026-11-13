@@ -1,6 +1,7 @@
 import { FileText, Eye, Download, Upload } from 'lucide-react';
 import { documents } from '../data/deal';
-import { Chip, actorStyle } from './ui';
+import { Chip, actorLabel } from './ui';
+import { AgentAvatar } from './AgentAvatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardIcon } from '@/components/ui/card';
 
@@ -33,8 +34,9 @@ export function DocumentsTab() {
               <div className="mt-0.5 flex items-center gap-1.5 text-[12px] text-faint">
                 <span>{doc.meta}</span>
                 <span>·</span>
-                <span className={`font-medium ${actorStyle[doc.by].fg}`}>
-                  {actorStyle[doc.by].label}
+                <span className="inline-flex items-center gap-1 font-medium text-muted">
+                  {doc.by === 'atlas' && <AgentAvatar agent={doc.agent ?? 'max'} size={16} />}
+                  {actorLabel(doc.by, doc.agent)}
                 </span>
                 <span>·</span>
                 <span>{doc.timestamp}</span>

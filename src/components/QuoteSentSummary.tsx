@@ -26,6 +26,7 @@ import { Input, Select } from '@/components/ui/input';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import { AgentAvatar } from './AgentAvatar';
 import { cn } from '@/lib/utils';
 
 const money = (n: number) => n.toLocaleString('en-US');
@@ -73,7 +74,7 @@ function NextAction({ today }: { today: string }) {
               icon: CalendarClock,
               tone: 'text-atlas border-atlas/40 bg-atlas/10',
               title: `Follow-up ${done.channel.toLowerCase()} on ${fmtDate(done.date)}`,
-              sub: done.byAtlas ? 'Atlas will send it automatically and log the reply.' : 'Added to your tasks.',
+              sub: done.byAtlas ? 'Max will send it automatically and log the reply.' : 'Added to your tasks.',
             };
     return (
       <Card className="flex h-full flex-col gap-3 p-4">
@@ -149,8 +150,9 @@ function NextAction({ today }: { today: string }) {
             />
           </div>
           <label className="flex cursor-pointer items-center gap-2 text-[12px] text-muted">
-            <Switch checked={byAtlas} onCheckedChange={setByAtlas} aria-label="Let Atlas send the follow-up" />
-            Let Atlas {channel === 'Email' ? 'send the follow-up email' : 'remind me and prep the call'}
+            <Switch checked={byAtlas} onCheckedChange={setByAtlas} aria-label="Let Max send the follow-up" />
+            <AgentAvatar agent="max" size={20} />
+            Let Max {channel === 'Email' ? 'send the follow-up email' : 'remind me and prep the call'}
           </label>
           <Button onClick={() => setDone({ kind: 'follow', date, channel, byAtlas })} className="mt-auto bg-atlas text-canvas hover:bg-atlas/90">
             {channel === 'Email' ? <Mail size={14} /> : <Phone size={14} />} Schedule follow-up
