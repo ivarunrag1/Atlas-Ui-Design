@@ -53,7 +53,7 @@ import { cn } from '@/lib/utils';
 type StepStatus = 'done' | 'current' | 'pending';
 
 const steps: { label: string; icon: LucideIcon; sub: string; detail: string; status: StepStatus }[] = [
-  { label: 'Search rates', icon: Search, sub: 'Query live carrier rates', detail: 'Parameters Atlas used to query carrier rates', status: 'done' },
+  { label: 'Search rates', icon: Search, sub: 'Query live carrier rates', detail: 'Parameters Max used to query carrier rates', status: 'done' },
   { label: 'Select results', icon: ListChecks, sub: 'Shortlist rate cards', detail: 'Pick one or more carriers to carry into the quote', status: 'done' },
   { label: 'Finalize pricing', icon: Receipt, sub: 'Edit charges · add margin', detail: 'Selected rates from step 2 — edit buy/sell amounts in the tables, or ask Atlas', status: 'done' },
   { label: 'Draft quote', icon: FileText, sub: 'Generate the quote PDF', detail: 'Generated Quote #Q-0142.pdf', status: 'done' },

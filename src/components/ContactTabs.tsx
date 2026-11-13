@@ -1,4 +1,4 @@
-import { Briefcase, Building2, Clock, Files, LayoutDashboard, ListTodo, Mail, ScanSearch, Sparkles, StickyNote, Target } from 'lucide-react';
+import { Briefcase, Building2, Clock, Files, LayoutDashboard, ListTodo, Mail, ScanSearch, StickyNote, Target } from 'lucide-react';
 import { messages, documents, comments } from '../data/deal';
 import type { ContactSummary } from '../data/contacts';
 import type { DealSummary } from '../data/deals';
@@ -14,6 +14,7 @@ import { EmailThread } from './EmailThread';
 import { TasksTab } from './TasksTab';
 import { CommentsTab } from './CommentsTab';
 import { DocumentsTab } from './DocumentsTab';
+import { AgentAvatar } from './AgentAvatar';
 import { splitList } from './company/parts';
 
 const pct = (n: number) => `${Math.round(n * 100)}%`;
@@ -33,8 +34,8 @@ function OverviewTab({ contact, org }: { contact: ContactSummary; org?: Organiza
       {contact.aiSummary ? (
         <Card className="space-y-2 p-4">
           <div className="flex items-center gap-2">
-            <Sparkles size={14} className="text-atlas" />
-            <span className="text-[12px] text-atlas">AI summary</span>
+            <AgentAvatar agent="maya" size={24} />
+            <span className="text-[12px] text-atlas">AI summary · by Maya</span>
           </div>
           <p className="text-[14px] leading-relaxed text-ink/90">{contact.aiSummary}</p>
         </Card>
