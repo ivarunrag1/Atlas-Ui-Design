@@ -50,7 +50,7 @@ import { Input } from '@/components/ui/input';
 import { SegmentedControl } from '@/components/ui/segmented-control';
 import { Hint } from '@/components/ui/tooltip';
 import { LineChart, Sparkline, StageBars } from './dashboard/charts';
-import { AgentAvatar } from './AgentAvatar';
+import { AgentAvatar, AiAgentTag } from './AgentAvatar';
 import type { AgentId } from '../data/agents';
 import { buildPriorities, type Agent, type Level, type Priority } from './dashboard/priorities';
 import { cn } from '@/lib/utils';
@@ -181,6 +181,7 @@ function AgentTag({ agent }: { agent: Agent }) {
     <span className="inline-flex items-center gap-2 rounded-full border border-line py-0.5 pr-3 pl-0.5 text-[14px] font-medium text-muted">
       <AgentAvatar agent={AGENT_ID[agent]} size={32} />
       {agent}
+      <AiAgentTag />
     </span>
   );
 }
@@ -232,7 +233,10 @@ function AgentCard({
       <div className="flex items-center gap-2.5">
         <AgentAvatar agent={AGENT_ID[agent]} size={48} />
         <div>
-          <div className="text-[14px] font-semibold text-ink">{agent}</div>
+          <div className="flex items-center gap-1.5 text-[14px] font-semibold text-ink">
+            {agent}
+            <AiAgentTag />
+          </div>
           <div className="text-[12px] text-faint">{role}</div>
         </div>
       </div>

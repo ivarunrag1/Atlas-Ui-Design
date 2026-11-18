@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import { messages, deal, type Message } from '../data/deal';
 import { Avatar, Chip } from './ui';
-import { AgentAvatar } from './AgentAvatar';
+import { AgentAvatar, AiAgentTag } from './AgentAvatar';
 import { Button } from '@/components/ui/button';
 import { Card, CardIcon } from '@/components/ui/card';
 import { Input, inputVariants } from '@/components/ui/input';
@@ -41,6 +41,7 @@ function MessageRow({ message, defaultOpen = false }: { message: Message; defaul
       >
         <Avatar initials={message.from.initials} actor={message.from.actor} agent={message.from.agent} size={24} />
         <span className="max-w-32 shrink-0 truncate text-[12px] font-semibold text-ink">{message.from.name}</span>
+        {message.from.actor === 'atlas' && <AiAgentTag />}
         <Dir size={12} className={incoming ? 'shrink-0 text-muted' : 'shrink-0 text-faint'} aria-label={incoming ? 'Received' : 'Sent'} />
         <span className={cn('min-w-0 flex-1 truncate text-[12px] text-muted', open && 'invisible')}>{message.body[0]}</span>
         <span className="shrink-0 text-[10px] text-faint">{message.timestamp}</span>
