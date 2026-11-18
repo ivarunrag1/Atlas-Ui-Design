@@ -71,3 +71,17 @@ export function AgentAvatar({
     </span>
   );
 }
+
+/** "AI agent" tag — sits next to an agent's name so a human portrait is never mistaken for a person. */
+export function AiAgentTag({ className }: { className?: string }) {
+  return (
+    <span
+      className={cn(
+        'inline-flex shrink-0 items-center rounded-full border border-atlas/40 px-1.5 text-[10px] leading-4 font-medium whitespace-nowrap text-atlas',
+        className,
+      )}
+    >
+      AI agent
+    </span>
+  );
+}
