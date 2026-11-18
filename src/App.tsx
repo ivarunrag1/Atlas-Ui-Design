@@ -65,7 +65,8 @@ export default function App() {
   const [converting, setConverting] = useState(false);
 
   const navigate = (label: string) => {
-    if (label === 'Dashboard') setView('dashboard');
+    if (label === 'Home') window.location.hash = '#/onboarding/home'; // Home lives in the onboarding prototype for now
+    else if (label === 'Dashboard') setView('dashboard');
     else if (label === 'Pipeline') setView('pipeline');
     else if (label === 'Leads') setView('leads');
     else if (label === 'Contacts') setView('contacts');
